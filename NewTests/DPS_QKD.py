@@ -57,13 +57,14 @@ class CQSDetector(QSDetectorTimeBin):
         self.interferometer.add_receiver(self.detectors[0])
         self.interferometer.add_receiver(self.detectors[1])
         self.add_receiver(self.detectors[2])
-
+        self.timestamps = []
         self.components = [self.interferometer] + self.detectors
         self.trigger_times = [[], [], []]
     def get(self,photon,**kwargs):
         # print("sending to interferometer")
-        self.interferometer.get(photon)
-        pass
+        self.timestamps.append(self.timeline.now())
+        # self.interferometer.get(photon)
+        return self.timeline.now()
 
 
 
@@ -83,24 +84,27 @@ class Alice(Node):
         # self.source.emit([(complex(1),complex(0))])
         # print(self.qchannels)
         # self.source.emit([(complex(0),complex(1))])
+        self.timesent = []
         self.emitPluse()
         
     
     def emitPluse(self,phase=[1,1,0,0,1,0,1,0,0,0]):
 
-        stateEarly = (complex(sqrt(1/2)),complex(sqrt(1/2)))
-        stateLate = (complex(sqrt(1/2)),-complex(sqrt(1/2)))
+        phase_0 = (complex(sqrt(1/2)),complex(sqrt(1/2)))
+        phase_pi = (complex(sqrt(1/2)),-complex(sqrt(1/2)))
         time = self.timeline.now()
         for i in range(len(phase)):
             if phase[i] == 0:
-                new_photon = Photon(str(i),self.timeline,encoding_type=time_bin,quantum_state=stateEarly)
+                new_photon = Photon(str(i),self.timeline,encoding_type=time_bin,quantum_state=phase_0)
             else:
-                new_photon = Photon(str(i),self.timeline,encoding_type=time_bin,quantum_state=stateLate)
-            time = time + 1400
+                new_photon = Photon(str(i),self.timeline,encoding_type=time_bin,quantum_state=phase_pi)
+            
             process = Process(self,'get',[new_photon])
             # print(time)
             event = Event(time,process)
             self.timeline.schedule(event)
+            self.timesent.append((time,phase[i]))
+            time = time + 1400
             
         # new_photon = Photon('photon', self.timeline,encoding_type=time_bin,quantum_state=stateEarly)
         # newp2 = Photon('photon2', self.timeline,encoding_type=time_bin,quantum_state=stateLate)
@@ -131,11 +135,11 @@ class Bob(Node):
         self.add_component(self.detector0)
         self.set_first_component(self.detector0.name)
         self.detector0.owner = self
-
+        self.timestamps = []
     def receive_qubit(self, src, qubit):
         # print("Qubit Recieved")
         measure = self.components[self.first_component_name].get(qubit)
-        # print(measure)
+        self.timestamps.append(measure)
 
 
 
@@ -162,6 +166,8 @@ tl.init()
 # alice.emitPluse(0)
 tl.run()
 
+print(alice.timesent)
+print(bob.timestamps)
 
 # state = (complex(1/np.sqrt(2)),complex(1/np.sqrt(2)))
 
