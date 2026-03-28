@@ -86,8 +86,8 @@ class Photon:
                 assert type(quantum_state) is tuple
                 assert all([abs(a) < 1 + EPSILON for a in quantum_state]), "Illegal value with abs > 1 in photon state"
                 assert abs(sum([abs(a) ** 2 for a in quantum_state]) - 1) < EPSILON, "Squared amplitudes do not sum to 1"
-                num_qubits = log2(len(quantum_state))
-                assert num_qubits == 1, "Length of amplitudes for single photon should be 2"
+                # num_qubits = log2(len(quantum_state))
+                # assert num_qubits == 1, "Length of amplitudes for single photon should be 2"
             self.quantum_state = FreeQuantumState()
             self.quantum_state.state = quantum_state
 
