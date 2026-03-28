@@ -29,10 +29,10 @@ class CDetector(Detector):
         if self.get_generator().random() < self.efficiency:
 
             self.record_detection()
-            print(self.timeline.now(),self.name)
-            return self.timeline.now()
-            # measurement = photon.measure(((complex(sqrt(1 / 2)), complex(sqrt(1 / 2))), (complex(sqrt(1 / 2)), complex(-sqrt(1 / 2)))),photon,np.random)
-            # return measurement
+            self._receivers[0].getkey(photon,self.timeline.now())
+            # print(self.timeline.now(),self.name,self._receivers[0].getkey(photon,self.timeline.now()))
+            # return self.timeline.now()
+            
         else:
             print(f'Photon loss in detector {self.name}')
 
@@ -45,26 +45,58 @@ class CInterferometer(Interferometer):
             "Invalid photon encoding {} received by interferometer".format(photon.encoding_type["name"])
         if photon.use_qm:
             raise NotImplementedError("Interferometer usage not configured for quantum manager.")
+        state = photon.quantum_state.state
+
+# -------- 3 time-bin interferometer --------
+        # print(len(state))
+        if len(state) == 3:
+
+            a, b, c = state
+            r = self.get_generator().random()
+
+            # print(a,b,c)
+            # outer slots probability
+            p_early = 0.16666666666
+            p_late  = 0.16666666666
+
+            # choose time slot
+            if r < p_early:
+                # time t
+                time = 0
+                detector_num = self.get_generator().choice([0,1])
+
+            elif r < 0.5:
+                # -------- first interference (E,M) --------
+                time = self.path_difference
+
+                # constructive / destructive
+                if abs(a + b) > abs(a - b):
+                    # print('constructive',time)
+                    detector_num = 0
+                else:
+                    # print('destructive',time)
+                    detector_num = 1
+
+            elif r < 1 - p_late:
+                # -------- second interference (M,L) --------
+                time = 2 * self.path_difference
+
+                if abs(b + c) > abs(b - c):
+                    detector_num = 0
+                    # print('constructive M,L',time)
+                else:
+                    detector_num = 1
+                    # print('destructive M,L',time)
+            else:
+                # time t+3T
+                time = 3 * self.path_difference
+                detector_num = self.get_generator().choice([0,1])
+
+        process = Process(self._receivers[detector_num], "get", [detector_num])
+        event = Event(self.timeline.now() + time, process)
+        self.timeline.schedule(event)
 
 
-
-class CQSDetector(QSDetectorTimeBin):
-    def __init__(self, name, timeline):
-        # super().__init__(name,timeline)
-        QSDetector.__init__(self, name, timeline)
-        self.detectors = [CDetector(name + ".detector" + str(i), timeline) for i in range(3)]
-        self.interferometer = Interferometer(name + ".interferometer", timeline, time_bin["bin_separation"])
-        self.interferometer.add_receiver(self.detectors[0])
-        self.interferometer.add_receiver(self.detectors[1])
-        self.add_receiver(self.detectors[2])
-        self.timestamps = []
-        self.components = [self.interferometer] + self.detectors
-        self.trigger_times = [[], [], []]
-    def get(self,photon,**kwargs):
-        # print("sending to interferometer")
-        self.timestamps.append(self.timeline.now())
-        # self.interferometer.get(photon)
-        return self.timeline.now()
 
 
 
@@ -73,54 +105,48 @@ class Alice(Node):
     def __init__(self, name, timeline, seed=None, gate_fid = 1, meas_fid = 1):
         super().__init__(name, timeline, seed, gate_fid, meas_fid)
 
-        # self.source = LightSource(name = 'photon_Source',
-        #                           timeline=tl,
-        #                           frequency=1e6,
-        #                           mean_photon_num=0.8,
-        #                           encoding_type=time_bin)
+        self.source = LightSource(name = 'photon_Source',
+                                  timeline=tl,
+                                  frequency=1e6,
+                                  mean_photon_num=0.8,
+                                  encoding_type=time_bin)
         
-        # self.add_component(self.source)
-        # self.source.add_receiver(self)
-        # self.source.emit([(complex(1),complex(0))])
+        self.add_component(self.source)
+        self.source.add_receiver(self)
+        self.source.emit([(complex(sqrt(1/3)),complex(sqrt(1/3)),complex(sqrt(1/3)))])
         # print(self.qchannels)
         # self.source.emit([(complex(0),complex(1))])
         self.timesent = []
-        self.emitPluse()
+        # self.emitPluse()
         
     
-    def emitPluse(self,phase=[1,1,0,0,1,0,1,0,0,0]):
+    def emitPluse(self,photon:Photon,phase=[0,1,1]):
 
-        phase_0 = (complex(sqrt(1/2)),complex(sqrt(1/2)))
-        phase_pi = (complex(sqrt(1/2)),-complex(sqrt(1/2)))
+        state = []
+
+        for ph in phase:
+            if ph == 0:
+                state.append(complex(sqrt(1/3)))
+            else :
+                state.append(-complex(sqrt(1/3)))
+
         time = self.timeline.now()
-        for i in range(len(phase)):
-            if phase[i] == 0:
-                new_photon = Photon(str(i),self.timeline,encoding_type=time_bin,quantum_state=phase_0)
-            else:
-                new_photon = Photon(str(i),self.timeline,encoding_type=time_bin,quantum_state=phase_pi)
-            
-            process = Process(self,'get',[new_photon])
-            # print(time)
-            event = Event(time,process)
-            self.timeline.schedule(event)
-            self.timesent.append((time,phase[i]))
-            time = time + 1400
-            
-        # new_photon = Photon('photon', self.timeline,encoding_type=time_bin,quantum_state=stateEarly)
-        # newp2 = Photon('photon2', self.timeline,encoding_type=time_bin,quantum_state=stateLate)
-          
-        # process2 = Process(self,'get',[newp2])  
-        # self.get(new_photon)
+        # new_photon = Photon('photon',self.timeline,encoding_type=time_bin,quantum_state=tuple(state))
+        photon.set_state(tuple(state)) 
+        self.qchannels[bob.name].transmit(photon,self)
+        # process = Process(self,'get',[photon])
+        # print(time)
+        # event = Event(time,process)
+        # self.timeline.schedule(event)
+        self.timesent.append((time))
         
-        # event2 = Event(tl.now(),process2)
-        
-        # self.timeline.schedule(event2)
 
     def get(self, photon, **kwargs):
         self.issent = True
+        self.emitPluse(photon,[0,1,0])
         # print("get method called")
         # print(self.qchannels)
-        self.qchannels[bob.name].transmit(photon,self)
+        
 
     
 
@@ -131,17 +157,30 @@ class Bob(Node):
     def __init__(self, name, timeline, seed=None, gate_fid = 1, meas_fid = 1):
         super().__init__(name, timeline, seed, gate_fid, meas_fid)
     
-        self.detector0 = CQSDetector(name='detector',timeline=tl)
-        self.add_component(self.detector0)
-        self.set_first_component(self.detector0.name)
-        self.detector0.owner = self
+        # self.detector0 = CQSDetector(name='detector',timeline=tl)
+        self.detectors = [CDetector(name + ".detector" + str(i), timeline) for i in range(3)]
+        self.interferometer = CInterferometer(name + ".interferometer", timeline, time_bin["bin_separation"])
+        self.interferometer.add_receiver(self.detectors[0])
+        self.interferometer.add_receiver(self.detectors[1])
+        self.add_receiver(self.detectors[2])
         self.timestamps = []
+        self.components = [self.interferometer] + self.detectors
+        self.detectors[0].add_receiver(self)
+        self.detectors[1].add_receiver(self)
+        # self.add_component(self.detector0)
+        # self.set_first_component(self.detector0.name)
+        # self.detector0.owner = self
+        # self.timestamps = []
     def receive_qubit(self, src, qubit):
         # print("Qubit Recieved")
-        measure = self.components[self.first_component_name].get(qubit)
-        self.timestamps.append(measure)
+        print(type(qubit),"qubit type")
+        self.interferometer.get(qubit)
+        # self.timestamps.append(measure)
 
+    def getkey(self,keybit,time):
 
+        self.timestamps.append(time)
+        print(keybit,time, "at Bob")
 
 alice = Alice("Alice",tl)
 bob = Bob("Bob",tl)
@@ -150,7 +189,7 @@ channel = QuantumChannel(
     name='qc',
     timeline=tl,
     attenuation=0,
-    distance=1000
+    distance=0
 )
 
 channel.set_ends(alice,bob.name)
@@ -166,8 +205,8 @@ tl.init()
 # alice.emitPluse(0)
 tl.run()
 
-print(alice.timesent)
-print(bob.timestamps)
+print("time sent (Alice):",alice.timesent)
+# print(bob.timestamps)
 
 # state = (complex(1/np.sqrt(2)),complex(1/np.sqrt(2)))
 
