@@ -6,7 +6,7 @@ from sequence.components.detector import Detector,QSDetector
 from sequence.components.interferometer import Interferometer
 from sequence.components.photon import Photon
 from sequence.components.light_source import LightSource
-from sequence.components.optical_channel import QuantumChannel
+from sequence.components.optical_channel import QuantumChannel,ClassicalChannel
 from sequence.components.detector import QSDetectorTimeBin
 import numpy as np
 from numpy import sqrt
@@ -30,8 +30,6 @@ class CDetector(Detector):
 
             self.record_detection()
             self._receivers[0].getkey(photon,self.timeline.now())
-            # print(self.timeline.now(),self.name,self._receivers[0].getkey(photon,self.timeline.now()))
-            # return self.timeline.now()
             
         else:
             print(f'Photon loss in detector {self.name}')
@@ -114,10 +112,7 @@ class Alice(Node):
         self.add_component(self.source)
         self.source.add_receiver(self)
         self.source.emit([(complex(sqrt(1/3)),complex(sqrt(1/3)),complex(sqrt(1/3)))])
-        # print(self.qchannels)
-        # self.source.emit([(complex(0),complex(1))])
         self.timesent = []
-        # self.emitPluse()
         
     
     def emitPluse(self,photon:Photon,phase=[0,1,1]):
@@ -131,13 +126,8 @@ class Alice(Node):
                 state.append(-complex(sqrt(1/3)))
 
         time = self.timeline.now()
-        # new_photon = Photon('photon',self.timeline,encoding_type=time_bin,quantum_state=tuple(state))
         photon.set_state(tuple(state)) 
         self.qchannels[bob.name].transmit(photon,self)
-        # process = Process(self,'get',[photon])
-        # print(time)
-        # event = Event(time,process)
-        # self.timeline.schedule(event)
         self.timesent.append((time))
         
 
@@ -146,7 +136,10 @@ class Alice(Node):
         self.emitPluse(photon,[0,1,0])
         # print("get method called")
         # print(self.qchannels)
-        
+    
+    def receive_message(self, src, msg):
+        print("message recieved from Bob:",msg)
+        # return super().receive_message(src, msg)
 
     
 
@@ -167,10 +160,7 @@ class Bob(Node):
         self.components = [self.interferometer] + self.detectors
         self.detectors[0].add_receiver(self)
         self.detectors[1].add_receiver(self)
-        # self.add_component(self.detector0)
-        # self.set_first_component(self.detector0.name)
-        # self.detector0.owner = self
-        # self.timestamps = []
+        # self.owner = self
     def receive_qubit(self, src, qubit):
         # print("Qubit Recieved")
         print(type(qubit),"qubit type")
@@ -178,10 +168,14 @@ class Bob(Node):
         # self.timestamps.append(measure)
 
     def getkey(self,keybit,time):
-
         self.timestamps.append(time)
+        print(self.cchannels)
+        # self.send_message(self.cchannels['Alice'],time)
+        self.cchannels[alice.name].transmit(time,self,1)
         print(keybit,time, "at Bob")
 
+    # def send_message(self, dst, msg, priority=...):
+    #     return super().send_message(dst, msg, priority)
 alice = Alice("Alice",tl)
 bob = Bob("Bob",tl)
 
@@ -193,6 +187,13 @@ channel = QuantumChannel(
 )
 
 channel.set_ends(alice,bob.name)
+
+cc = ClassicalChannel('cc',tl,1000)
+
+cc.set_ends(bob,alice.name)
+# cc.set_ends(alice,bob.name)
+
+# channel.set_ends(bob, alice.name)
 
 phase = 0
 # emitprocess = Process(Alice,'emitPluse',[alice,phase])
