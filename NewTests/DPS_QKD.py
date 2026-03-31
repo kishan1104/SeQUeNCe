@@ -1,7 +1,7 @@
 from sequence.kernel.timeline import Timeline
 
 from sequence.topology.node import Node
-from sequence.components.switch import Switch
+from sequence.protocol import StackProtocol
 from sequence.components.detector import Detector,QSDetector
 from sequence.components.interferometer import Interferometer
 from sequence.components.photon import Photon
@@ -96,9 +96,98 @@ class CInterferometer(Interferometer):
 
 
 
+class DPSProtocol(StackProtocol):
+
+    def __init__(self, owner:Node, name:str,lightsource:str,interferometer:str,role = -1):
+        super().__init__(owner, name)
+        self.ls_name = lightsource
+        self.interferometer_name = interferometer
+        self.role = role
+
+        self.working = False
+        self.ready = True
+        self.light_time = 0
+        self.ls_freq = 0
+        self.start_time = 0
+        self.photon_delay = 0
+        self.phases_list = []
+        self.timeAtdetector = []
+        self.key = 0
+        self.key_bits = None
+        self.another = None
+        self.key_length = 0
+
+        self.latency = 0
+        self.last_key_time = 0
+        self.throughputs = []
+        self.error_rates = []
+    
+    def push(self,length:int):
+        if self.role != 0:
+            assert "Generate key must be called by alice"
+        
+        if self.ready:
+            self.ready = False
+            self.working = True
+            self.another.working = True
+            self.start_protocol()
+        
+    
+    def start_protocol(self):
+        """Method to start protocol.
+
+        When called, this method will begin the process of key generation.
+        Parameters for hardware will be calculated, and a `begin_photon_pulse` method scheduled.
+
+        Side Effects:
+            Will schedule future `begin_photon_pulse` event.
+            Will send a BEGIN_PHOTON_PULSE method to other protocol instance.
+        """
+        print("starting protocol")
+
+        ls = self.owner.components[self.ls_name]
+        self.ls_freq = ls.frequency
+
+        # send message that photon pulse is beginning, then send bits
+        self.start_time = int(self.owner.timeline.now()) + round(self.owner.cchannels[self.another.owner.name].delay)
+
+        self.owner.send_message(self.another.owner.name,"starting photon pulses")
 
 
+        process = Process(self,"begin_photon_pulse",[])
+        event = Event(self.start_time,process)
 
+        self.owner.timeline.schedule(event)
+        self.last_key_time = self.owner.timeline.now()
+
+    def begin_photon_pulse(self):
+        """Method to begin sending photons
+
+        """    
+        print("starting photon pulse")
+        if self.working:
+            self.owner.destination = self.another.owner.name
+
+            num_pulses = round(self.light_time*self.ls_freq)
+
+            pulse_list = np.random.choice([0,1,2,3],num_pulses)
+
+
+            #hardware
+            lightsource = self.owner.components[self.ls_name]
+            encoding_type = lightsource.encoding_type
+            state_list = []
+            for i in range(num_pulses):
+                if pulse_list[i] == 0:
+                    state = (complex(sqrt(1/3)),complex(sqrt(1/3)),complex(sqrt(1/3)))
+                elif pulse_list[i] == 1:
+                    state = (complex(sqrt(1/3)),complex(sqrt(1/3)),-complex(sqrt(1/3)))
+                elif pulse_list[i] == 2:
+                    state = (complex(sqrt(1/3)),-complex(sqrt(1/3)),complex(sqrt(1/3)))
+                else:
+                    state = (complex(sqrt(1/3)),-complex(sqrt(1/3)),-complex(sqrt(1/3)))
+                state_list.append(state)
+            
 class Alice(Node):
     def __init__(self, name, timeline, seed=None, gate_fid = 1, meas_fid = 1):
         super().__init__(name, timeline, seed, gate_fid, meas_fid)
@@ -113,17 +202,14 @@ class Alice(Node):
         self.source.add_receiver(self)
         self.source.emit([(complex(sqrt(1/3)),complex(sqrt(1/3)),complex(sqrt(1/3)))])
         self.timesent = []
-        
     
-    def emitPluse(self,photon:Photon,phase=[0,1,1]):
+    def emitPulse(self,photon:Photon):
 
         state = []
 
-        for ph in phase:
-            if ph == 0:
-                state.append(complex(sqrt(1/3)))
-            else :
-                state.append(-complex(sqrt(1/3)))
+        for ph in range(3):
+            phase = self.get_generator().choice([-1, 1])   
+            state.append(phase * complex(sqrt(1/3)))         
 
         time = self.timeline.now()
         photon.set_state(tuple(state)) 
@@ -133,7 +219,7 @@ class Alice(Node):
 
     def get(self, photon, **kwargs):
         self.issent = True
-        self.emitPluse(photon,[0,1,0])
+        self.emitPulse(photon)
         # print("get method called")
         # print(self.qchannels)
     
@@ -196,14 +282,14 @@ cc.set_ends(bob,alice.name)
 # channel.set_ends(bob, alice.name)
 
 phase = 0
-# emitprocess = Process(Alice,'emitPluse',[alice,phase])
+# emitprocess = Process(Alice,'emitPulse',[alice,phase])
 
 
 
 tl.init()
 # emit_event = Event(88,emitprocess)
 # tl.schedule(emit_event)
-# alice.emitPluse(0)
+# alice.emitPulse(0)
 tl.run()
 
 print("time sent (Alice):",alice.timesent)
