@@ -75,7 +75,7 @@ class LightSource(Entity):
 
         time = self.timeline.now()
         period = int(round(1e12 / self.frequency))
-
+        # print("period:", period)
         for i, state in enumerate(state_list):
             num_photons = self.get_generator().poisson(self.mean_photon_num)
 
@@ -89,7 +89,7 @@ class LightSource(Entity):
                                     location=self.owner,
                                     encoding_type=self.encoding_type,
                                     quantum_state=state)
-                process = Process(self._receivers[0], "get", [new_photon])
+                process = Process(self._receivers[0], "get", [new_photon,time])
                 event = Event(time, process)
                 self.timeline.schedule(event)
                 self.photon_counter += 1
