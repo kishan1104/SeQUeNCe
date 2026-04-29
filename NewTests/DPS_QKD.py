@@ -35,7 +35,10 @@ class CDetector(Detector):
         if self.get_generator().random() < self.efficiency:
 
             self.record_detection()
-            self._receivers[0].get(self.name, self.timeline.now())
+            process = Process( self._receivers[0], "photonDet",   [self.name, self.timeline.now()])
+            event = Event(self.timeline.now(), process)
+            self.timeline.schedule(event)
+            # self._receivers[0].get(self.name, self.timeline.now())
             # print("recieved detector of arrival:",self.name, self.timeline.now())
 
             
@@ -109,22 +112,22 @@ class CInterferometer(Interferometer):
 
 
 
-class Alice(Node):
-    def __init__(self, name, timeline, seed=None, gate_fid = 1, meas_fid = 1):
-        super().__init__(name, timeline, seed, gate_fid, meas_fid)
+# class Alice(Node):
+#     def __init__(self, name, timeline, seed=None, gate_fid = 1, meas_fid = 1):
+#         super().__init__(name, timeline, seed, gate_fid, meas_fid)
 
-        self.source = LightSource(name = 'light_source',
-                                  timeline=tl,
-                                  frequency=1e6,
-                                  mean_photon_num=0.2,
-                                  encoding_type=time_bin)
-        self.aliceKey = ''
-        self.add_component(self.source)
-        self.source.add_receiver(self)
+#         source = LightSource(name = 'light_source',
+#                                   timeline=tl,
+#                                   frequency=1e6,
+#                                   mean_photon_num=0.2,
+#                                   encoding_type=time_bin)
+#         self.aliceKey = ''
+#         self.add_component(source)
+#         source.add_receiver(self)
 
-    def get(self, photon, **kwargs):
-        self.issent = True
-        self.qchannels[bob.name].transmit(photon,self)
+#     def get(self, photon, time,**kwargs):
+#         self.issent = True
+#         self.qchannels[bob.name].transmit(photon,self)
         
 
     
@@ -132,22 +135,60 @@ class Alice(Node):
 
 
 
-class Bob(Node):
+# class Bob(Node):
+#     def __init__(self, name, timeline, seed=None, gate_fid = 1, meas_fid = 1):
+#         super().__init__(name, timeline, seed, gate_fid, meas_fid)
+#         self.detectors = [CDetector(name + ".detector" + str(i), timeline) for i in range(2)]
+#         self.interferometer = CInterferometer(name + ".interferometer", timeline, time_bin["bin_separation"])
+#         self.interferometer.add_receiver(self.detectors[0])
+#         self.interferometer.add_receiver(self.detectors[1])
+#         self.timestamps = []
+#         self.components = [self.interferometer] + self.detectors
+#         self.detectors[0].add_receiver(self)
+#         self.detectors[1].add_receiver(self)
+
+
+    
+
+#     def photonDet(self,detector,time, **kwargs):
+#         for p in self.protocols:
+            
+#             if hasattr(p, "pop"):
+#                 p.pop(detector, time)
+
+#     def receive_qubit(self, src, qubit):
+#         self.interferometer.get(qubit)
+
+
+class DPSNode(Node):
     def __init__(self, name, timeline, seed=None, gate_fid = 1, meas_fid = 1):
         super().__init__(name, timeline, seed, gate_fid, meas_fid)
+        self.source = LightSource(name = name+'light_source',
+                                  timeline=tl,
+                                  frequency=1e6,
+                                  mean_photon_num=0.2,
+                                  encoding_type=time_bin)
+        self.aliceKey = ''
+        self.bobKey = ''
+        self.add_component(self.source)
+        self.source.add_receiver(self)
         self.detectors = [CDetector(name + ".detector" + str(i), timeline) for i in range(2)]
         self.interferometer = CInterferometer(name + ".interferometer", timeline, time_bin["bin_separation"])
         self.interferometer.add_receiver(self.detectors[0])
         self.interferometer.add_receiver(self.detectors[1])
         self.timestamps = []
-        self.components = [self.interferometer] + self.detectors
+        self.comps = [self.interferometer] + self.detectors
         self.detectors[0].add_receiver(self)
         self.detectors[1].add_receiver(self)
+        
 
+    def get(self, photon, time,**kwargs):
+        self.issent = True
+        self.qchannels[bob.name].transmit(photon,self)
 
     
 
-    def get(self,detector,time, **kwargs):
+    def photonDet(self,detector,time, **kwargs):
         for p in self.protocols:
             
             if hasattr(p, "pop"):
@@ -155,38 +196,84 @@ class Bob(Node):
 
     def receive_qubit(self, src, qubit):
         self.interferometer.get(qubit)
-        
-alice = Alice("Alice",tl)
-bob = Bob("Bob",tl)
 
-channel = QuantumChannel(
+
+
+class Node3Net:
+    def __init__(self,node1,node2,node3):
+        
+        # self.alice = DPSNode(name1,tl)
+        # self.bob = DPSNode(name2,tl)
+        # self.charlie = DPSNode(name2,tl)
+        self.node1 = node1
+        self.node2 = node2
+        self.node3 = node3
+    
+    def GetKey(self,node1:Node,node2:Node):
+        self.alice_dps = DPS(node1,'dps',node1.name+'light_source') 
+        self.bob_dps = DPS(node2,'dps',node2.name+'light_source') 
+        
+        pair_dps_protocols(self.alice_dps,self.bob_dps)
+
+        node1.protocols.append(self.alice_dps)
+        node2.protocols.append(self.bob_dps)
+
+        self.alice_dps.push(128)
+
+
+
+alice = DPSNode("Alice",tl)
+bob = DPSNode("Bob",tl)
+charlie = DPSNode("Charlie",tl)
+qc_ab = QuantumChannel(
     name='qc',
     timeline=tl,
     attenuation=0,
     distance=0
 )
 
-channel.set_ends(alice,bob.name)
-
-cca_b = ClassicalChannel('cc',tl,1000)
-ccb_a = ClassicalChannel('cc2',tl,1000)
-cca_b.set_ends(bob,alice.name)
-ccb_a.set_ends(alice,bob.name)
+qc_bc = QuantumChannel(
+    'qc_bc',tl,0,0
+)
 
 
-alice_dps = DPS(alice,"dps","light_source")
-bob_dps   = DPS(bob,"dps","light_source")
 
-pair_dps_protocols(alice_dps,bob_dps)
+qc_ab.set_ends(alice,bob.name)
 
-alice.protocols.append(alice_dps)
-bob.protocols.append(bob_dps)
+qc_bc.set_ends(bob,charlie.name)
 
 
-alice_dps.push(128)
+cca_ba = ClassicalChannel('cc',tl,1000)
+ccb_ab = ClassicalChannel('cc2',tl,1000)
+ccc_bc = ClassicalChannel('cc3',tl,1000)
+ccb_cb = ClassicalChannel('cc4',tl,1000)
+cca_ba.set_ends(bob,alice.name)
+ccb_ab.set_ends(alice,bob.name)
+ccc_bc.set_ends(bob,charlie.name)
+ccb_cb.set_ends(charlie,bob.name)
+
+sim3 = Node3Net(alice,bob,charlie)
+
+sim3.GetKey(alice,bob)
+
+sim3.GetKey(bob,charlie)
+
+# alice_dps = DPS(alice,"dps","Alicelight_source")
+# bob_dps   = DPS(bob,"dps","Boblight_source")
+
+# pair_dps_protocols(alice_dps,bob_dps)
+
+# alice.protocols.append(alice_dps)
+# bob.protocols.append(bob_dps)
+
+
+# alice_dps.push(128)
 
      
 tl.init()
 
 tl.run()
 
+# print(alice.aliceKey)
+print(bob.aliceKey)
+print(bob.bobKey)

@@ -96,7 +96,7 @@ class DPS(StackProtocol):
 # start protocol
 # =========================================================
     def start_protocol(self):
-
+        # print(self.owner.components)
         ls = self.owner.components[self.ls_name]
         self.ls_freq = ls.frequency
 
@@ -151,6 +151,7 @@ class DPS(StackProtocol):
     def emit_single(self):
 
         ls = self.owner.components[self.ls_name]
+        # print(self.owner.components)
 
         send_time = self.owner.timeline.now()
         self.send_times.append(send_time)
@@ -197,8 +198,9 @@ class DPS(StackProtocol):
                     self.bobkey.append(0)
                 elif det == 'Bob.detector1':
                     self.bobkey.append(1)
-
-        print("Bob KEY  :", "".join(map(str,self.bobkey)))
+        self.owner.bobKey = "".join(map(str,self.bobkey))
+        # print("Bob KEY  :", "".join(map(str,self.bobkey)))
+        # print(self.owner.bobKey)
         # print("Bob sending times:", self.times)
 
 
@@ -287,8 +289,8 @@ class DPS(StackProtocol):
                 # print(self.key,"key now")
                 self.key_bits = []
                 print(len(self.key),self.key_length)
-               
-                print("ALICE KEY:", self.key) 
+                self.owner.aliceKey = self.key
+                # print("ALICE KEY:", self.owner.aliceKey) 
             # self._pop(info=self.key)
 
                 # self.key_bits.clear()
