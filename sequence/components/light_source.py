@@ -89,7 +89,7 @@ class LightSource(Entity):
                                     location=self.owner,
                                     encoding_type=self.encoding_type,
                                     quantum_state=state)
-                process = Process(self._receivers[0], "get", [new_photon,time])
+                process = Process(self._receivers[0], "get", [new_photon])
                 event = Event(time, process)
                 self.timeline.schedule(event)
                 self.photon_counter += 1

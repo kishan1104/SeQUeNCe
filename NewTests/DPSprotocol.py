@@ -6,7 +6,7 @@ from sequence.protocol import StackProtocol
 from sequence.message import Message
 from sequence.kernel.process import Process
 from sequence.kernel.event import Event
-
+from sequence.constants import SPEED_OF_LIGHT
 
 # =========================================================
 # Pair function
@@ -180,7 +180,12 @@ class DPS(StackProtocol):
         # print(self.times, "Bob recorded times")
         self.bob_results.append((time, detector))
         # print(self.bob_results, "Bob recorded times and detectors")
+    def sendQubit(self,photon):
+        if self.role == 1:
+            return
 
+        self.owner.send_qubit(self.another.owner.name, photon)
+        
 # =========================================================
 # Bob send detection times
 # =========================================================
@@ -189,15 +194,22 @@ class DPS(StackProtocol):
         # bin_sep = self.another.owner.components[self.ls_name].encoding_type["bin_separation"]
 
         bob_key = []
-
+        print(len(self.bob_results))
+        count = 0
         for t, det in self.bob_results:
+            delay = self.another.owner.qchannels[self.owner.name].distance / SPEED_OF_LIGHT
+            t = t - delay
             bin_seperation = 1400
             slot = (t%10000)//bin_seperation
             if slot == 1 or slot == 2:
-                if det == 'Bob.detector0':
+                count += 1
+                if det == f'{self.owner.name}.detector0':
                     self.bobkey.append(0)
-                elif det == 'Bob.detector1':
+                elif det == f'{self.owner.name}.detector1':
                     self.bobkey.append(1)
+        print("self is ", self.owner.name)
+        print("keybits:", self.bobkey)
+        print("Number of key bits:", count)
         self.owner.bobKey = "".join(map(str,self.bobkey))
         # print("Bob KEY  :", "".join(map(str,self.bobkey)))
         # print(self.owner.bobKey)
@@ -242,6 +254,12 @@ class DPS(StackProtocol):
 
             # print("Alice received times:", msg.times)
             # print("Alice send times    :", self.send_times)
+            print(len(msg.times), "detection times received")
+            self.distance = self.owner.qchannels[self.another.owner.name].distance
+            delay = self.distance / SPEED_OF_LIGHT
+            # print("Distance:", self.distance, "m, Delay:", delay, "ps")
+            msg.times = [int(t - delay) for t in msg.times]
+            # print("Alice times after delay correction:", msg.times)
             # print("Alice phaselist :",self.phase_list)
             idx = 0
             # print(len(self.phase_list), "Alice phase list")
@@ -280,6 +298,7 @@ class DPS(StackProtocol):
                     # bit = 0 if p2 == 1 else 1
             # print(self.key_bits,"self key")                 
             if self.key_bits:
+                # print("Alice key bits:", self.key_bits)
                 bits = ''
                 for bit in self.key_bits:
                     # print(bit, end=' ')
