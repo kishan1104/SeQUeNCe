@@ -1,3 +1,5 @@
+# from NewTests.DPS_QKD import DPSKeyMessage
+# from jupyter_server_terminals import msg
 import numpy as np
 from enum import Enum, auto
 from numpy import sqrt
@@ -24,7 +26,7 @@ def pair_dps_protocols(alice, bob):
 class DPSMsgType(Enum):
     BEGIN_PHOTON_PULSE = auto()
     DETECTION_TIME = auto()
-
+    KEY_PROPAGATION = auto()
 
 # =========================================================
 # Message
@@ -42,8 +44,12 @@ class DPSMessage(Message):
 
         elif msg_type is DPSMsgType.DETECTION_TIME:
             self.times = kwargs["times"]
-
-
+        
+        elif msg_type is DPSMsgType.KEY_PROPAGATION:
+            self.key = kwargs["key"]
+            self.keyname = kwargs["keyname"]
+            self.xorKey = kwargs["xorKey"]
+        
 # =========================================================
 # DPS Protocol
 # =========================================================
@@ -82,10 +88,11 @@ class DPS(StackProtocol):
             raise Exception("Only Alice starts DPS")
 
         self.key_length = length
-        # self.send_times = []
-        # self.phase_list = []
+        self.send_times = []
+        self.phase_list = []
         self.key_bits = []
-        # self.bob_results= []
+        self.bob_results= []
+        self.times = []
         self.working = True
         self.another.working = True
         # print("called push")
@@ -194,7 +201,7 @@ class DPS(StackProtocol):
         # bin_sep = self.another.owner.components[self.ls_name].encoding_type["bin_separation"]
 
         bob_key = []
-        print(len(self.bob_results))
+        print("length",len(self.bob_results))
         count = 0
         for t, det in self.bob_results:
             delay = self.another.owner.qchannels[self.owner.name].distance / SPEED_OF_LIGHT
@@ -207,10 +214,11 @@ class DPS(StackProtocol):
                     self.bobkey.append(0)
                 elif det == f'{self.owner.name}.detector1':
                     self.bobkey.append(1)
-        print("self is ", self.owner.name)
-        print("keybits:", self.bobkey)
-        print("Number of key bits:", count)
-        self.owner.bobKey = "".join(map(str,self.bobkey))
+        # print("self is ", self.owner.name)
+        # print("keybits:", self.bobkey)
+        # print("Number of key bits:", count)
+        if self.owner.bobKey == '':
+            self.owner.bobKey = "".join(map(str,self.bobkey))
         # print("Bob KEY  :", "".join(map(str,self.bobkey)))
         # print(self.owner.bobKey)
         # print("Bob sending times:", self.times)
@@ -246,6 +254,9 @@ class DPS(StackProtocol):
             
             self.owner.timeline.schedule(event)
 
+        elif msg.msg_type is DPSMsgType.KEY_PROPAGATION:
+            print(f"{self.owner.name} received key propogation message with key: {msg.key}")
+
         # Alice receives detection times
         elif msg.msg_type is DPSMsgType.DETECTION_TIME:
 
@@ -254,7 +265,7 @@ class DPS(StackProtocol):
 
             # print("Alice received times:", msg.times)
             # print("Alice send times    :", self.send_times)
-            print(len(msg.times), "detection times received")
+            # print(len(msg.times), "detection times received",self.owner.timeline.now())
             self.distance = self.owner.qchannels[self.another.owner.name].distance
             delay = self.distance / SPEED_OF_LIGHT
             # print("Distance:", self.distance, "m, Delay:", delay, "ps")
@@ -263,6 +274,7 @@ class DPS(StackProtocol):
             # print("Alice phaselist :",self.phase_list)
             idx = 0
             # print(len(self.phase_list), "Alice phase list")
+            print(len(self.key_bits), "Alice key bits before processing detection times")
             for t in msg.times:
                 while idx < len(self.send_times):
                     if t - self.send_times[idx]  <= 4200 and t - self.send_times[idx] >= 0:
@@ -308,11 +320,12 @@ class DPS(StackProtocol):
                 # print(self.key,"key now")
                 self.key_bits = []
                 print(len(self.key),self.key_length)
-                self.owner.aliceKey = self.key
+                if self.owner.aliceKey == '':
+                    self.owner.aliceKey = self.key
                 # print("ALICE KEY:", self.owner.aliceKey) 
             # self._pop(info=self.key)
 
-                # self.key_bits.clear()
+            self.key_bits.clear()
 
 
 # =========================================================

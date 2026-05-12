@@ -1,7 +1,8 @@
 import time
 
 from sequence.kernel.timeline import Timeline
-
+from NewTests.DPSprotocol import DPSMessage,DPSMsgType
+from sequence.message import Message
 from sequence.topology.node import Node,QKDNode,QSDetectorTimeBin
 from sequence.protocol import StackProtocol
 from sequence.components.detector import Detector,QSDetector
@@ -22,7 +23,7 @@ print("started running test")
 
 
 tl = Timeline()
-
+tl2 = Timeline()
 pi  = np.pi
 
 class CDetector(Detector):
@@ -156,6 +157,20 @@ class DPSNode(Node):
         self.interferometer.get(qubit)
 
 
+    def propogate_key(self,msg):
+        print(self.dpskeys)
+        print(f"{self.name} is propogating key {msg.keyname} with xorKey {msg.xorKey}")
+        self.dpskeys[msg.keyname] =''.join(str(int(a) ^ int(b)) for a, b in zip(msg.key, self.dpskeys[msg.xorKey]))
+
+    def receive_message(self, src, msg):
+
+        if msg.msg_type is DPSMsgType.KEY_PROPAGATION:
+            self.propogate_key(msg)
+            # print(f"{self.name} received key propogation message with key: {msg.key}, keyname: {msg.keyname}, xorKey: {msg.xorKey}")
+        else:
+            self.protocols[0].received_message(src, msg)
+            print(f"{self.name} received message of type {msg.msg_type} with content: {msg.payload}") 
+
 
 class Node3Net:
     def __init__(self,nodes:list[Node],tl,keysize=128):
@@ -194,16 +209,96 @@ class Node3Net:
         for i,(node1,node2) in enumerate(key_bet):
             if i == 0:
                 start_time = self.timeline.now()
-                end_time = start_time + (int((self.key_size / node1.source.frequency) * 1e12)+10000)  # Run for a duration that allows key generation
+                end_time = start_time + (int((self.key_size / node1.source.frequency) * 1e12))  # Run for a duration that allows key generation
                 process = Process(self,"GetKey",[node1,node2])
                 event = Event(start_time, process)
                 self.timeline.schedule(event)
             else:
-                start_time = end_time + 10000  # Schedule next round after the previous one finishes
-                end_time = start_time + (int((self.key_size / node1.source.frequency) * 1e12)+10000)
+                start_time = end_time   # Schedule next round after the previous one finishes
+                end_time = start_time + (int((self.key_size / node1.source.frequency) * 1e12))
                 process = Process(self,"GetKey",[node1,node2])
                 event = Event(start_time, process)
                 self.timeline.schedule(event)
+        print(end_time, "scheduled all key generation processes")
+        start_time = end_time
+        end_time = start_time +(int((self.key_size / node1.source.frequency) * 1e12))
+        process = Process(self,"make_keys",[nodes])
+        event = Event(end_time, process)
+        self.timeline.schedule(event)
+        process2 = Process(self,"propogate_Keys",[nodes])
+        event2 = Event(end_time+ 20000, process2)
+        self.timeline.schedule(event2)
+    
+    def make_keys(self,nodes:list[Node]):
+        for i,node in enumerate(nodes):
+            if i == 0:
+                node.dpskeys[f'K{i+1}'] = node.aliceKey
+            elif i == len(nodes)-1:
+                node.dpskeys[f'K{i}'] = node.bobKey
+            
+            else:
+                node.dpskeys[f'K{i}'] = node.bobKey
+                node.dpskeys[f'K{i+1}'] = node.aliceKey
+        print(self.timeline.now(), "finished key generation, propogating keys")
+        
+    def propogate_Keys(self,nodes:list[Node]):
+        minimum = 128
+        for i, node in enumerate(nodes):
+            for key,value in node.dpskeys.items():
+                if len(value) < minimum:
+                    minimum = len(value)
+        print("minimum key length:", minimum)
+        for i,node in enumerate(nodes):
+            for key in node.dpskeys.keys():
+                node.dpskeys[key] = node.dpskeys[key][:minimum]
+        delay_time = 0
+        process = Process(self,"propagation1",[])
+        event = Event(self.timeline.now()+delay_time, process)
+        self.timeline.schedule(event)
+        delay_time += 20000000
+        process2 = Process(self,"propagation2",[])
+        event2 = Event(self.timeline.now()+delay_time, process2)
+        self.timeline.schedule(event2)
+        delay_time += 20000000
+        process3 = Process(self,"propagation3",[])
+        event3 = Event(self.timeline.now()+delay_time, process3)
+        self.timeline.schedule(event3)
+       
+    def propagation1(self):
+        # first Propogation from Node1 to Node0 and Node2
+        msg1 = nodes[1].dpskeys['K1']
+        msg2 = nodes[1].dpskeys['K2']
+        send_msg = ''.join(str(int(a) ^ int(b)) for a, b in zip(msg1, msg2))
+        key_name = f'K{2}'
+        nodes[1].send_message(nodes[0].name, DPSMessage(DPSMsgType.KEY_PROPAGATION,nodes[0].name,key = send_msg,keyname=key_name,xorKey='K1'))
+        key_name = f'K{1}'
+        nodes[1].send_message(nodes[2].name, DPSMessage(DPSMsgType.KEY_PROPAGATION,nodes[2].name,key = send_msg,keyname=key_name,xorKey='K2'))
+    
+    def propagation2(self):
+        msg1 = nodes[2].dpskeys['K2']
+        msg2 = nodes[2].dpskeys['K3']
+        send_msg = ''.join(str(int(a) ^ int(b)) for a, b in zip(msg1, msg2))
+        key_name = f'K{3}'
+        nodes[2].send_message(nodes[1].name, DPSMessage(DPSMsgType.KEY_PROPAGATION,nodes[3].name,key = send_msg,keyname=key_name,xorKey='K2'))
+        key_name = f'K{2}'
+        nodes[2].send_message(nodes[3].name, DPSMessage(DPSMsgType.KEY_PROPAGATION,nodes[1].name,key = send_msg,keyname=key_name,xorKey='K3'))
+    
+    def propagation3(self):
+        # print(nodes[0].dpskeys)
+        msg1 = nodes[1].dpskeys['K1']
+        msg2 = nodes[1].dpskeys['K3']
+        send_msg = ''.join(str(int(a) ^ int(b)) for a, b in zip(msg1, msg2))
+        key_name = f'K{3}'
+        nodes[1].send_message(nodes[0].name, DPSMessage(DPSMsgType.KEY_PROPAGATION,nodes[0].name,key = send_msg,keyname=key_name,xorKey='K1'))
+        msg1 = nodes[2].dpskeys['K1']
+        msg2 = nodes[2].dpskeys['K3']
+        send_msg = ''.join(str(int(a) ^ int(b)) for a, b in zip(msg1, msg2))
+        key_name = f'K{1}'
+        nodes[2].send_message(nodes[3].name, DPSMessage(DPSMsgType.KEY_PROPAGATION,nodes[3].name,key = send_msg,keyname=key_name,xorKey='K3'))
+
+
+
+
 
 
 
@@ -223,17 +318,15 @@ def CreateNetwork(numberofnodes,tl):
 
     return nodes
 
-def make_keys(nodes:list[Node]):
-    for i,node in enumerate(nodes):
-        if i == 0:
-            node.dpskeys[f'K{i+1}'] = node.aliceKey
-        elif i == len(nodes)-1:
-            node.dpskeys[f'K{i}'] = node.bobKey
-        
-        else:
-            node.dpskeys[f'K{i}'] = node.bobKey
-            node.dpskeys[f'K{i+1}'] = node.aliceKey
-            
+
+
+
+class DPSKeyMessage(Message):
+    def __init__(self,msg_type,dst,key):
+        super().__init__(msg_type,dst)
+        self.key = key
+
+
 
 nodes = CreateNetwork(4,tl)
 
@@ -250,7 +343,8 @@ tl.init()
 
 tl.run()
 
-make_keys(nodes)
+
+
 
 for i,node in enumerate(nodes):
     print(f"{node.name}'s dps keys: {node.dpskeys}")
