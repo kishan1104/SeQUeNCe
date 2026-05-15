@@ -1,9 +1,10 @@
 import time
+from unicodedata import name
 
 from sequence.kernel.timeline import Timeline
 from NewTests.DPSprotocol import DPSMessage,DPSMsgType
 from sequence.message import Message
-from sequence.topology.node import Node,QKDNode,QSDetectorTimeBin
+from sequence.topology.node import Node,QKDNode,QSDetectorTimeBin,QuantumRouter
 from sequence.protocol import StackProtocol
 from sequence.components.detector import Detector,QSDetector
 from sequence.components.interferometer import Interferometer
@@ -15,6 +16,8 @@ import numpy as np
 from numpy import sqrt
 from sequence.kernel.process import Process
 from sequence.kernel.event import Event
+from sequence.topology.router_net_topo import RouterNetTopo
+from sequence.topology.topology import Topology as Topo
 from sequence.utils.encoding import time_bin
 from NewTests.DPSprotocol import DPS,pair_dps_protocols,DPSMessage
 
@@ -25,6 +28,11 @@ print("started running test")
 tl = Timeline()
 tl2 = Timeline()
 pi  = np.pi
+
+
+
+
+
 
 class CDetector(Detector):
     def __init__(self, name, timeline, efficiency = 1, dark_count = 0, count_rate = 25000000, time_resolution = 150):
@@ -115,9 +123,9 @@ class CInterferometer(Interferometer):
 
 
 
-class DPSNode(Node):
+class DPSNode(QuantumRouter):
     def __init__(self, name, timeline, seed=None, gate_fid = 1, meas_fid = 1):
-        super().__init__(name, timeline, seed, gate_fid, meas_fid)
+        super().__init__(name, timeline, seed=seed, gate_fid=gate_fid, meas_fid=meas_fid)
         self.source = LightSource(name = name+'light_source',
                                   timeline=tl,
                                   frequency=1e6,
@@ -173,7 +181,7 @@ class DPSNode(Node):
 
 
 class Node3Net:
-    def __init__(self,nodes:list[Node],tl,keysize=128):
+    def __init__(self,nodes:list,tl,keysize=128):
         
         # self.alice = DPSNode(name1,tl)
         # self.bob = DPSNode(name2,tl)
@@ -222,10 +230,10 @@ class Node3Net:
         print(end_time, "scheduled all key generation processes")
         start_time = end_time
         end_time = start_time +(int((self.key_size / node1.source.frequency) * 1e12))
-        process = Process(self,"make_keys",[nodes])
+        process = Process(self,"make_keys",[self.nodes])
         event = Event(end_time, process)
         self.timeline.schedule(event)
-        process2 = Process(self,"propogate_Keys",[nodes])
+        process2 = Process(self,"propogate_Keys",[self.nodes])
         event2 = Event(end_time+ 20000, process2)
         self.timeline.schedule(event2)
     
@@ -252,19 +260,19 @@ class Node3Net:
             for key in node.dpskeys.keys():
                 node.dpskeys[key] = node.dpskeys[key][:minimum]
         delay_time = 0
-        process = Process(self,"propagation1",[])
+        process = Process(self,"propagation1",[nodes])
         event = Event(self.timeline.now()+delay_time, process)
         self.timeline.schedule(event)
         delay_time += 20000000
-        process2 = Process(self,"propagation2",[])
+        process2 = Process(self,"propagation2",[nodes])
         event2 = Event(self.timeline.now()+delay_time, process2)
         self.timeline.schedule(event2)
         delay_time += 20000000
-        process3 = Process(self,"propagation3",[])
+        process3 = Process(self,"propagation3",[nodes])
         event3 = Event(self.timeline.now()+delay_time, process3)
         self.timeline.schedule(event3)
        
-    def propagation1(self):
+    def propagation1(self,nodes:list[Node]):
         # first Propogation from Node1 to Node0 and Node2
         msg1 = nodes[1].dpskeys['K1']
         msg2 = nodes[1].dpskeys['K2']
@@ -274,7 +282,7 @@ class Node3Net:
         key_name = f'K{1}'
         nodes[1].send_message(nodes[2].name, DPSMessage(DPSMsgType.KEY_PROPAGATION,nodes[2].name,key = send_msg,keyname=key_name,xorKey='K2'))
     
-    def propagation2(self):
+    def propagation2(self,nodes:list[Node]):
         msg1 = nodes[2].dpskeys['K2']
         msg2 = nodes[2].dpskeys['K3']
         send_msg = ''.join(str(int(a) ^ int(b)) for a, b in zip(msg1, msg2))
@@ -283,7 +291,7 @@ class Node3Net:
         key_name = f'K{2}'
         nodes[2].send_message(nodes[3].name, DPSMessage(DPSMsgType.KEY_PROPAGATION,nodes[1].name,key = send_msg,keyname=key_name,xorKey='K3'))
     
-    def propagation3(self):
+    def propagation3(self,nodes:list[Node]):
         # print(nodes[0].dpskeys)
         msg1 = nodes[1].dpskeys['K1']
         msg2 = nodes[1].dpskeys['K3']
@@ -326,13 +334,42 @@ class DPSKeyMessage(Message):
         super().__init__(msg_type,dst)
         self.key = key
 
+class ExtRouterNetTopo(RouterNetTopo):
 
 
-nodes = CreateNetwork(4,tl)
+    DPS_NODE = "DPSNode"
 
-sim3 = Node3Net(nodes,tl)
+    def __init__(self, conf_file_name: str):
+        super().__init__(conf_file_name)
 
-sim3.run()
+    def _add_nodes(self, config: dict):
+        for node in config[Topo.ALL_NODE]:
+            seed = node[Topo.SEED]
+            node_type = node[Topo.TYPE]
+            name = node[Topo.NAME]
+            template_name = node.get(Topo.TEMPLATE, None)
+            template = self.templates.get(template_name, {})
+            if node_type == self.DPS_NODE:
+                node_obj = DPSNode(name, self.tl, seed=seed, **template)
+            elif node_type == self.BSM_NODE:
+                node_obj = DPSNode(name, self.tl, seed=seed, **template)
+            else:
+                raise ValueError(f"Unknown type of node '{node_type}'")
+
+            node_obj.set_seed(seed)
+            self.nodes[node_type].append(node_obj)
+
+network_config_file = 'clustered_network.json'
+network_topo = ExtRouterNetTopo(network_config_file)
+tl = network_topo.get_timeline()
+routers = network_topo.get_nodes_by_type(ExtRouterNetTopo.DPS_NODE)
+
+
+router_names = [node.name for node in routers]
+
+print("routers in the network:", router_names)
+
+
 
 
 
@@ -346,8 +383,8 @@ tl.run()
 
 
 
-for i,node in enumerate(nodes):
-    print(f"{node.name}'s dps keys: {node.dpskeys}")
+# for i,node in enumerate(nodes):
+#     print(f"{node.name}'s dps keys: {node.dpskeys}")
 
 # for node in nodes:
 #     print(f"{node.name}'s alice key: {node.aliceKey}")
