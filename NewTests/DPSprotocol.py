@@ -18,7 +18,7 @@ def pair_dps_protocols(alice, bob):
     bob.another = alice
     alice.role = 0
     bob.role = 1
-
+    print(f"Paired {alice.owner.name}'s {alice.name} with {bob.owner.name}'s {bob.name}")
 
 # =========================================================
 # Message Types
@@ -104,6 +104,7 @@ class DPS(StackProtocol):
 # =========================================================
     def start_protocol(self):
         # print(self.owner.components)
+        # print(f"{self.owner.name} starting DPS protocol at time {self.owner.timeline.now()} ps")
         ls = self.owner.components[self.ls_name]
         self.ls_freq = ls.frequency
 
@@ -131,7 +132,7 @@ class DPS(StackProtocol):
 # Alice send 3-pulse DPS states
 # =========================================================
     def begin_photon_pulse(self):
-
+        # print(f"{self.owner.name} begin photon pulse at time {self.owner.timeline.now()} ps")
         if self.role != 0:
             return
 
@@ -149,7 +150,7 @@ class DPS(StackProtocol):
             event = Event(time, process)
 
             self.owner.timeline.schedule(event)
-
+            # print(f"Scheduled pulse {i+1} at time {time} ps")
 
     def setList(self, time):
         self.send_times.append(time)
@@ -161,6 +162,8 @@ class DPS(StackProtocol):
         # print(self.owner.components)
 
         send_time = self.owner.timeline.now()
+
+        # print(f"{self.owner.name} emitting pulse at time {send_time} ps")
         self.send_times.append(send_time)
 
         state = [complex(sqrt(1/3))]
@@ -175,6 +178,7 @@ class DPS(StackProtocol):
 
         ls.emit([tuple(state)])
         self.total_emmited += 1
+        # print(f"Emitted pulse {self.total_emmited} at time {send_time} ps")
 # =========================================================
 # Bob detector input (only time)
 # =========================================================
@@ -187,6 +191,7 @@ class DPS(StackProtocol):
         # print(self.times, "Bob recorded times")
         self.bob_results.append((time, detector))
         # print(self.bob_results, "Bob recorded times and detectors")
+        print(len(self.bob_results), "Bob recorded results so far,time:", time)
     def sendQubit(self,photon):
         if self.role == 1:
             return
@@ -201,7 +206,7 @@ class DPS(StackProtocol):
         # bin_sep = self.another.owner.components[self.ls_name].encoding_type["bin_separation"]
 
         bob_key = []
-        print("length",len(self.bob_results))
+        # print("length of bob results",len(self.times))
         count = 0
         for t, det in self.bob_results:
             delay = self.another.owner.qchannels[self.owner.name].distance / SPEED_OF_LIGHT
@@ -224,7 +229,7 @@ class DPS(StackProtocol):
         # print("Bob sending times:", self.times)
 
 
-        self.bob_results = []
+        # self.bob_results = []
         msg = DPSMessage(
             DPSMsgType.DETECTION_TIME,
             self.another.name,
@@ -245,9 +250,10 @@ class DPS(StackProtocol):
             self.ls_freq = msg.frequency
             self.light_time = msg.light_time
             self.start_time = msg.start_time
+            delay = self.owner.qchannels[f'{self.another.owner.name}'].distance / SPEED_OF_LIGHT
 
             # self.times = []
-            end = self.start_time + int(self.light_time * 1e12) + 5000  # wait for 5000 ps after last pulse
+            end = self.start_time + int(self.light_time * 1e12) + delay + 5000  # wait for 5000 ps after last pulse
 
             process = Process(self, "end_detection", [])
             event = Event(end, process)
@@ -266,7 +272,7 @@ class DPS(StackProtocol):
             # print("Alice received times:", msg.times)
             # print("Alice send times    :", self.send_times)
             # print(len(msg.times), "detection times received",self.owner.timeline.now())
-            self.distance = self.owner.qchannels[self.another.owner.name].distance
+            self.distance = self.owner.qchannels[f'{self.another.owner.name}'].distance
             delay = self.distance / SPEED_OF_LIGHT
             # print("Distance:", self.distance, "m, Delay:", delay, "ps")
             msg.times = [int(t - delay) for t in msg.times]
@@ -274,7 +280,7 @@ class DPS(StackProtocol):
             # print("Alice phaselist :",self.phase_list)
             idx = 0
             # print(len(self.phase_list), "Alice phase list")
-            print(len(self.key_bits), "Alice key bits before processing detection times")
+            # print(len(self.key_bits), "Alice key bits before processing detection times")
             for t in msg.times:
                 while idx < len(self.send_times):
                     if t - self.send_times[idx]  <= 4200 and t - self.send_times[idx] >= 0:

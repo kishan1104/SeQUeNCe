@@ -96,134 +96,134 @@
       "node1": "N0",
       "node2": "N1",
       "attenuation": 0,
-      "distance": 20000,
-      "type": "meet_in_the_middle"
+      "distance": 200000,
+      "type": "quantum"
     },
     {
       "node1": "N1",
       "node2": "N2",
       "attenuation": 0,
-      "distance": 20000,
-      "type": "meet_in_the_middle"
+      "distance": 200000,
+      "type": "quantum"
     },
     {
       "node1": "N2",
       "node2": "N3",
       "attenuation": 0,
-      "distance": 20000,
-      "type": "meet_in_the_middle"
+      "distance": 200000,
+      "type": "quantum"
     },
     {
       "node1": "N3",
       "node2": "N4",
       "attenuation": 0,
-      "distance": 20000,
-      "type": "meet_in_the_middle"
+      "distance": 200000,
+      "type": "quantum"
     },
     {
       "node1": "N0",
       "node2": "N00",
       "attenuation": 0,
-      "distance": 2000,
-      "type": "meet_in_the_middle"
+      "distance": 200000,
+      "type": "quantum"
     },
     {
       "node1": "N0",
       "node2": "N01",
       "attenuation": 0,
-      "distance": 2000,
-      "type": "meet_in_the_middle"
+      "distance": 200000,
+      "type": "quantum"
     },
     {
       "node1": "N00",
       "node2": "N01",
       "attenuation": 0,
-      "distance": 2000,
-      "type": "meet_in_the_middle"
+      "distance": 200000,
+      "type": "quantum"
     },
     {
       "node1": "N1",
       "node2": "N10",
       "attenuation": 0,
-      "distance": 2000,
-      "type": "meet_in_the_middle"
+      "distance": 200000,
+      "type": "quantum"
     },
     {
       "node1": "N1",
       "node2": "N11",
       "attenuation": 0,
-      "distance": 2000,
-      "type": "meet_in_the_middle"
+      "distance": 200000,
+      "type": "quantum"
     },
     {
       "node1": "N10",
       "node2": "N11",
       "attenuation": 0,
-      "distance": 2000,
-      "type": "meet_in_the_middle"
+      "distance": 200000,
+      "type": "quantum"
     },
     {
       "node1": "N2",
       "node2": "N20",
       "attenuation": 0,
-      "distance": 2000,
-      "type": "meet_in_the_middle"
+      "distance": 200000,
+      "type": "quantum"
     },
     {
       "node1": "N2",
       "node2": "N21",
       "attenuation": 0,
-      "distance": 2000,
-      "type": "meet_in_the_middle"
+      "distance": 200000,
+      "type": "quantum"
     },
     {
       "node1": "N20",
       "node2": "N21",
       "attenuation": 0,
-      "distance": 2000,
-      "type": "meet_in_the_middle"
+      "distance": 200000,
+      "type": "quantum"
     },
     {
       "node1": "N3",
       "node2": "N30",
       "attenuation": 0,
-      "distance": 2000,
-      "type": "meet_in_the_middle"
+      "distance": 200000,
+      "type": "quantum"
     },
     {
       "node1": "N3",
       "node2": "N31",
       "attenuation": 0,
-      "distance": 2000,
-      "type": "meet_in_the_middle"
+      "distance": 200000,
+      "type": "quantum"
     },
     {
       "node1": "N30",
       "node2": "N31",
       "attenuation": 0,
-      "distance": 2000,
-      "type": "meet_in_the_middle"
+      "distance": 200000,
+      "type": "quantum"
     },
     {
       "node1": "N4",
       "node2": "N40",
       "attenuation": 0,
-      "distance": 2000,
-      "type": "meet_in_the_middle"
+      "distance": 200000,
+      "type": "quantum"
     },
     {
       "node1": "N4",
       "node2": "N41",
       "attenuation": 0,
-      "distance": 2000,
-      "type": "meet_in_the_middle"
+      "distance": 200000,
+      "type": "quantum"
     },
     {
       "node1": "N40",
       "node2": "N41",
       "attenuation": 0,
-      "distance": 2000,
-      "type": "meet_in_the_middle"
+      "distance": 200000,
+      "type": "quantum"
     }
   ],
   "cconnections": [
