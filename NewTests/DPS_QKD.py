@@ -23,163 +23,180 @@ from NewTests.DPSprotocol import DPS,pair_dps_protocols,DPSMessage
 from sequence.constants import SPEED_OF_LIGHT
 print("started running test")
 
+from NewTests.Utility import calculate_qber, estimate_qber, CreateNetwork
+from NewTests.CustomComponents import DPSNode
 
-tl = Timeline()
-tl2 = Timeline()
+# tl = Timeline()
+# tl2 = Timeline()
 pi  = np.pi
 
 
 
-
-
-
-class CDetector(Detector):
-    def __init__(self, name, timeline, efficiency = 1, dark_count = 0, count_rate = 25000000, time_resolution = 150):
-        super().__init__(name, timeline, efficiency, dark_count, count_rate, time_resolution)
     
-    def get(self,photon=None, **kwargs):
-        self.photon_counter +=1
+
+
+
+
+
+
+
+# class CDetector(Detector):
+#     def __init__(self, name, timeline, efficiency = 1, dark_count = 0, count_rate = 25000000, time_resolution = 150):
+#         super().__init__(name, timeline, efficiency, dark_count, count_rate, time_resolution)
+    
+#     def get(self,photon=None, **kwargs):
+#         self.photon_counter +=1
         
-        if self.get_generator().random() < self.efficiency:
+#         if self.get_generator().random() < self.efficiency:
 
-            self.record_detection()
-            process = Process( self._receivers[0], "photonDet",   [self.name, self.timeline.now()])
-            event = Event(self.timeline.now(), process)
-            self.timeline.schedule(event)
-            # self._receivers[0].get(self.name, self.timeline.now())
-            # print("recieved detector of arrival:",self.name, self.timeline.now())
+#             self.record_detection()
+#             process = Process( self._receivers[0], "photonDet",   [self.name, self.timeline.now()])
+#             event = Event(self.timeline.now(), process)
+#             self.timeline.schedule(event)
+#             # self._receivers[0].get(self.name, self.timeline.now())
+#             # print("recieved detector of arrival:",self.name, self.timeline.now())
 
             
-        else:
-            print(f'Photon loss in detector {self.name}')
+#         else:
+#             print(f'Photon loss in detector {self.name}')
 
-class CInterferometer(Interferometer):
-    def __init__(self, name, timeline, path_diff, phase_error=0):
-        super().__init__(name, timeline, path_diff, phase_error)
-        pass
-    def get(self,photon:"Photon",**kwargs):
-        assert photon.encoding_type["name"] == "time_bin", \
-            "Invalid photon encoding {} received by interferometer".format(photon.encoding_type["name"])
-        if photon.use_qm:
-            raise NotImplementedError("Interferometer usage not configured for quantum manager.")
-        state = photon.quantum_state.state
+# class CInterferometer(Interferometer):
+#     def __init__(self, name, timeline, path_diff, phase_error=0):
+#         super().__init__(name, timeline, path_diff, phase_error)
+#         pass
+#     def get(self,photon:"Photon",**kwargs):
+#         assert photon.encoding_type["name"] == "time_bin", \
+#             "Invalid photon encoding {} received by interferometer".format(photon.encoding_type["name"])
+#         if photon.use_qm:
+#             raise NotImplementedError("Interferometer usage not configured for quantum manager.")
+#         state = photon.quantum_state.state
 
-        # print("allival at interferometer,:", self.timeline.now(), "state:", state)
-# -------- 3 time-bin interferometer --------
-        # print(len(state))
-        if len(state) == 3:
+#         # print("allival at interferometer,:", self.timeline.now(), "state:", state)
+# # -------- 3 time-bin interferometer --------
+#         # print(len(state))
+#         if len(state) == 3:
 
-            a, b, c = state
-            r = self.get_generator().random()
+#             a, b, c = state
+#             r = self.get_generator().random()
 
-            # print(a,b,c)
-            # outer slots probability
-            p_early = 0.16666666666
-            p_late  = 0.16666666666
+#             # print(a,b,c)
+#             # outer slots probability
+#             p_early = 0.16666666666
+#             p_late  = 0.16666666666
 
-            # choose time slot
-            if r < p_early:
-                # time t
-                time = 0
-                detector_num = self.get_generator().choice([0,1])
+#             # choose time slot
+#             if r < p_early:
+#                 # time t
+#                 time = 0
+#                 detector_num = self.get_generator().choice([0,1])
 
-            elif r < 0.5:
-                # -------- first interference (E,M) --------
-                time = self.path_difference
+#             elif r < 0.5:
+#                 # -------- first interference (E,M) --------
+#                 time = self.path_difference
 
-                # constructive / destructive
-                if abs(a + b) > abs(a - b):
-                    # print('constructive',time)
-                    # print('constructive E M', abs(a+b), 'a,b ',abs(a-b), "a and b",a,"   ",b)
-                    detector_num = 0
-                else:
-                    # print('destructive',abs(a + b),' a,b ', abs(a - b),abs(a-b), "a and b",a,"   ",b)
-                    # print('destructive',time)
-                    detector_num = 1
+#                 # constructive / destructive
+#                 if abs(a + b) > abs(a - b):
+#                     # print('constructive',time)
+#                     # print('constructive E M', abs(a+b), 'a,b ',abs(a-b), "a and b",a,"   ",b)
+#                     detector_num = 0
+#                 else:
+#                     # print('destructive',abs(a + b),' a,b ', abs(a - b),abs(a-b), "a and b",a,"   ",b)
+#                     # print('destructive',time)
+#                     detector_num = 1
 
-            elif r < 1 - p_late:
-                # -------- second interference (M,L) --------
-                time = 2 * self.path_difference
+#             elif r < 1 - p_late:
+#                 # -------- second interference (M,L) --------
+#                 time = 2 * self.path_difference
 
-                if abs(b + c) > abs(b - c):
-                    # print('constructive',abs(b + c),' b,c ', abs(b - c), "b and c",b,"   ",c)
-                    detector_num = 0
-                    # print('constructive M,L',time)
-                else:
-                    # print('destructive',abs(b + c),' b,c ', abs(b - c), "b and c",b,"   ",c)
-                    detector_num = 1
-                    # print('destructive M,L',time)
-            else:
-                # time t+3T
-                time = 3 * self.path_difference
-                detector_num = self.get_generator().choice([0,1])
-        # print(detector_num)
-        process = Process( self._receivers[detector_num], "get",   [photon])
-        event = Event(self.timeline.now() + time, process)
-        self.timeline.schedule(event)
-
-
+#                 if abs(b + c) > abs(b - c):
+#                     # print('constructive',abs(b + c),' b,c ', abs(b - c), "b and c",b,"   ",c)
+#                     detector_num = 0
+#                     # print('constructive M,L',time)
+#                 else:
+#                     # print('destructive',abs(b + c),' b,c ', abs(b - c), "b and c",b,"   ",c)
+#                     detector_num = 1
+#                     # print('destructive M,L',time)
+#             else:
+#                 # time t+3T
+#                 time = 3 * self.path_difference
+#                 detector_num = self.get_generator().choice([0,1])
+#         # print(detector_num)
+#         process = Process( self._receivers[detector_num], "get",   [photon])
+#         event = Event(self.timeline.now() + time, process)
+#         self.timeline.schedule(event)
 
 
 
-class DPSNode(QuantumRouter):
-    def __init__(self, name, timeline, seed=None, gate_fid = 1, meas_fid = 1):
-        super().__init__(name, timeline, seed=seed, gate_fid=gate_fid, meas_fid=meas_fid)
-        self.source = LightSource(name = name+'light_source',
-                                  timeline=timeline,
-                                  frequency=1e6,
-                                  mean_photon_num=0.2,
-                                  encoding_type=time_bin)
-        self.aliceKey = ''
-        self.bobKey = ''
-        self.dpskeys = {}
-        self.add_component(self.source)
-        self.source.add_receiver(self)
-        self.detectors = [CDetector(name + ".detector" + str(i), timeline) for i in range(2)]
-        self.interferometer = CInterferometer(name + ".interferometer", timeline, time_bin["bin_separation"])
-        self.interferometer.add_receiver(self.detectors[0])
-        self.interferometer.add_receiver(self.detectors[1])
-        self.timestamps = []
-        self.comps = [self.interferometer] + self.detectors
-        self.detectors[0].add_receiver(self)
-        self.detectors[1].add_receiver(self)
-        self.counter = 0
-
-    def get(self, photon,**kwargs):
-        self.issent = True
-        # print(self.qchannels[bob.name])
-        # self.qchannels[bob.name].transmit(photon,self)
-        # print(f"{self.name} is sending a qubit at time {self.timeline.now()} with state {photon.quantum_state.state}")
-        self.protocols[0].sendQubit(photon)
-
-    def send_qubit(self, dst, qubit):
-        return super().send_qubit(dst, qubit)
-
-    def photonDet(self,detector,time, **kwargs):
-        # print(self.counter)
-        self.counter += 1
-        for p in self.protocols:
-            
-            if hasattr(p, "pop"):
-                p.pop(detector, time)
-
-    def receive_qubit(self, src, qubit):
-        self.interferometer.get(qubit)
 
 
-    def propogate_key(self,msg):
-        # print(self.dpskeys)
-        # print(f"{self.name} is propogating key {msg.keyname} with xorKey {msg.xorKey}")
-        self.dpskeys[msg.keyname] =''.join(str(int(a) ^ int(b)) for a, b in zip(msg.key, self.dpskeys[msg.xorKey]))
+# class DPSNode(QKDNode):
+#     def __init__(self, name, timeline, seed=None, ):
+#         super().__init__(name, timeline, seed=seed,)
+#         self.source = LightSource(name = name+'light_source',
+#                                   timeline=timeline,
+#                                   frequency=1e6,
+#                                   mean_photon_num=0.2,
+#                                   encoding_type=time_bin)
+#         self.aliceKey = ''
+#         self.bobKey = ''
+#         self.dpskeys = {}
+#         self.add_component(self.source)
+#         self.source.add_receiver(self)
+#         self.detectors = [CDetector(name + ".detector" + str(i), timeline) for i in range(2)]
+#         self.interferometer = CInterferometer(name + ".interferometer", timeline, time_bin["bin_separation"])
+#         self.interferometer.add_receiver(self.detectors[0])
+#         self.interferometer.add_receiver(self.detectors[1])
+#         self.timestamps = []
+#         self.comps = [self.interferometer] + self.detectors
+#         self.detectors[0].add_receiver(self)
+#         self.detectors[1].add_receiver(self)
+#         self.counter = 0
 
-    def receive_message(self, src, msg):
+#     def init(self):
+#         pass
+        
 
-        if msg.msg_type is DPSMsgType.KEY_PROPAGATION:
-            self.propogate_key(msg)
-            # print(f"{self.name} received key propogation message with key: {msg.key}, keyname: {msg.keyname}, xorKey: {msg.xorKey}")
-        else:
-            self.protocols[0].received_message(src, msg)
-            print(f"{self.name} received message of type {msg.msg_type} with content: {msg.payload}") 
+#     def get(self, photon,**kwargs):
+#         self.issent = True
+#         # print(self.qchannels[bob.name])
+#         # self.qchannels[bob.name].transmit(photon,self)
+#         # print(f"{self.name} is sending a qubit at time {self.timeline.now()} with state {photon.quantum_state.state}")
+#         self.protocols[0].sendQubit(photon)
+
+#     def send_qubit(self, dst, qubit):
+#         return super().send_qubit(dst, qubit)
+
+#     def photonDet(self,detector,time, **kwargs):
+#         # print(self.counter)
+#         self.counter += 1
+#         for p in self.protocols:
+#             if p == "BB84":
+#                 print("BB84 protocol not yet implemented for QKDNode; skipping photon detection handling.")
+#             elif p.name == "dps":
+#                  if hasattr(p, "pop"):
+#                     p.pop(detector, time)
+#             # if hasattr(p, "pop"):
+#             #     p.pop(detector, time)
+#             else:
+#                 print(f"Unknown protocol {p.name} at node {self.name}; cannot handle photon detection.")
+
+#     def receive_qubit(self, src, qubit):
+#         self.interferometer.get(qubit)
+
+
+#     def propogate_key(self,msg):
+#         # print(self.dpskeys)
+#         # print(f"{self.name} is propogating key {msg.keyname} with xorKey {msg.xorKey}")
+#         self.dpskeys[msg.keyname] =''.join(str(int(a) ^ int(b)) for a, b in zip(msg.key, self.dpskeys[msg.xorKey]))
+
+#     def receive_message(self, src, msg):
+
+#         if msg.msg_type is DPSMsgType.KEY_PROPAGATION:
+#             self.propogate_key(msg)
+#             # print(f"{self.name} received key propogation message with key: {msg.key}, keyname: {msg.keyname}, xorKey: {msg.xorKey}")
+#         else:
+#             self.protocols[0].received_message(src, msg)
+#             print(f"{self.name} received message of type {msg.msg_type} with content: {msg.payload}") 
 
 
 class Node3Net:
@@ -237,9 +254,9 @@ class Node3Net:
         process = Process(self,"make_keys",[self.nodes])
         event = Event(end_time, process)
         self.timeline.schedule(event)
-        process2 = Process(self,"propogate_Keys",[self.nodes])
-        event2 = Event(end_time+ 20000, process2)
-        self.timeline.schedule(event2)
+        # process2 = Process(self,"propogate_Keys",[self.nodes])
+        # event2 = Event(end_time+ 20000, process2)
+        # self.timeline.schedule(event2)
     
     def make_keys(self,nodes:list[Node]):
         for i,node in enumerate(nodes):
@@ -314,21 +331,7 @@ class Node3Net:
 
 
 
-def CreateNetwork(numberofnodes,tl):
-    nodes = []
-    for i in range(numberofnodes):
-        node = DPSNode(f'Node{i}', tl)
-        nodes.append(node)
-    for i,node in enumerate(nodes):
-        if i < numberofnodes - 1:
-            qc = QuantumChannel(f'qc_{node.name}_{nodes[i+1].name}', tl, attenuation=0, distance=1000)
-            qc.set_ends(node, nodes[i+1].name)
-            cc1 = ClassicalChannel(f'cc_{node.name}_{nodes[i+1].name}', tl, 1000)
-            cc2 = ClassicalChannel(f'cc_{nodes[i+1].name}_{node.name}', tl, 1000)
-            cc1.set_ends(node, nodes[i+1].name)
-            cc2.set_ends(nodes[i+1], node.name)
 
-    return nodes
 
 
 
@@ -448,36 +451,78 @@ main_routers = [router for router in routers if router.name in ['N0', 'N1', 'N2'
 
 bsm_routers = [router for router in routers if router.name not in ['N0', 'N1', 'N2', 'N3', 'N4']]
 
-print("routers in the network:", main_routers)
+# print("routers in the network:", main_routers)
 
-nodes = CreateNetwork(5, timeline)
+# nodes = CreateNetwork(2, tl, DPSNode)
 
-nwt = Node3Net(main_routers[:-1], timeline)
+# nwt = Node3Net(nodes, tl,256)
 
-nwt.run()
+# nwt.run()
 
 # nwt.GetKey(main_routers[0],main_routers[1])
 # nwt.GetKey(nodes[0],nodes[1])
 
-     
-# tl.init()
+def test(n):
+    nodenwt = []
+    nodes = []
+    timelines = []
+    for i in range(n):
+        tim = Timeline()
+        node = CreateNetwork(2, tim, DPSNode)
+        nwt = Node3Net(node, tim,256)
+        nodenwt.append(nwt)
+        nodes.append(node)
+        timelines.append(tim)
+    return nodenwt,nodes,timelines
 
 
 
-# tl.run()
+nwtnodes, node_list, timeline_list = test(100)
 
-timeline.init()
-timeline.run()
+for i,tm in enumerate(timeline_list):
+        tm.init()
+        nwtnodes[i].run()
+        tm.run()
+
+
+
+# timeline.init()
+# timeline.run()
 
 
 needed_keys = [('N0','N11'),('N2','N41')]
 
 
-for i,node in enumerate(main_routers):
-    print(f" {node.name}'s dps keys: {node.dpskeys}")
+# for i,node in enumerate(nodes):
+#     print(f" {node.name}'s dps keys: {node.dpskeys}")
+
+def print_keys_and_qber(nodes:list[Node]):
+    quber_list = []
+    for i,node in enumerate(nodes):
+        # print(node[0].aliceKey,node[1].bobKey)
+        if  len(node[0].aliceKey) > len(node[1].bobKey):
+            qber = calculate_qber(node[0].aliceKey[:len(node[1].bobKey)], node[1].bobKey)
+            print(f"quber of {i}", qber)
+            quber_list.append(qber)
+        else: 
+            qber = calculate_qber(node[0].aliceKey, node[1].bobKey[:len(node[0].aliceKey)])
+            print(f"quber of {i}", qber)
+            quber_list.append(qber)
+    print("average qber:", sum(quber_list)/len(quber_list))
+
+    
+print_keys_and_qber(node_list)
+
 
 # for node in nodes:
 #     print(f"{node.name}'s alice key: {node.aliceKey}")
 #     print(f"{node.name}'s bob key  : {node.bobKey}")
+
+# if  len(nodes[0].aliceKey) > len(nodes[1].bobKey):
+#     print(calculate_qber(nodes[0].aliceKey[:len(nodes[1].bobKey)], nodes[1].bobKey))
+# else: 
+#     print(calculate_qber(nodes[0].aliceKey, nodes[1].bobKey[:len(nodes[0].aliceKey)]))
+
+# print(calculate_qber(nodes[0].aliceKey, nodes[1].bobKey))
 
 

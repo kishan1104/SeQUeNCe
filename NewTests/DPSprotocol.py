@@ -9,6 +9,8 @@ from sequence.message import Message
 from sequence.kernel.process import Process
 from sequence.kernel.event import Event
 from sequence.constants import SPEED_OF_LIGHT
+# from math import 
+from sympy import sqrt,pi, cos, sin
 
 # =========================================================
 # Pair function
@@ -18,7 +20,7 @@ def pair_dps_protocols(alice, bob):
     bob.another = alice
     alice.role = 0
     bob.role = 1
-    print(f"Paired {alice.owner.name}'s {alice.name} with {bob.owner.name}'s {bob.name}")
+    # print(f"Paired {alice.owner.name}'s {alice.name} with {bob.owner.name}'s {bob.name}")
 
 # =========================================================
 # Message Types
@@ -165,17 +167,30 @@ class DPS(StackProtocol):
 
         # print(f"{self.owner.name} emitting pulse at time {send_time} ps")
         self.send_times.append(send_time)
-
+        
         state = [complex(sqrt(1/3))]
         sentstate = []
         phases = [1]
         for ph in range(2):
-            phase = np.random.choice([-1, 1])   
-            state.append(phase * complex(sqrt(1/3)))
-            sentstate.append(int(phase))
-            phases.append(phase)
+            phvalue = np.random.choice([1,-1])   
+            # phase = cos(phvalue) + 1j*sin(phvalue)
+            # print(f"Chosen phase for pulse {phvalue}: {phase} radians")
+            # print(f"State contribution for pulse {phvalue}: {phase * complex(sqrt(1/3))}")
+            state.append(phvalue * complex(sqrt(1/3)))
+            sentstate.append((phvalue))
+            phases.append(phvalue)
         self.phase_list.append(phases)
-
+        if self.owner.get_generator().random() <= 0:
+                chosen = np.random.choice([1,2])
+                r = self.owner.get_generator().random()
+                if r < 0.5:
+                    delta = np.random.uniform(0, pi/4)
+                elif r < 0.75:
+                    delta = np.random.uniform(0, pi/2)
+                else:
+                    delta = np.random.uniform(0,pi)
+                state[chosen] = state[chosen] * (cos(delta) + 1j*sin(delta))
+                # print(f"Introducing noise to pulse {chosen} with delta {delta} radians, resulting in state contribution: {state[chosen]}") 
         ls.emit([tuple(state)])
         self.total_emmited += 1
         # print(f"Emitted pulse {self.total_emmited} at time {send_time} ps")
@@ -191,7 +206,7 @@ class DPS(StackProtocol):
         # print(self.times, "Bob recorded times")
         self.bob_results.append((time, detector))
         # print(self.bob_results, "Bob recorded times and detectors")
-        print(len(self.bob_results), "Bob recorded results so far,time:", time)
+        # print(len(self.bob_results), "Bob recorded results so far,time:", time)
     def sendQubit(self,photon):
         if self.role == 1:
             return
@@ -250,7 +265,8 @@ class DPS(StackProtocol):
             self.ls_freq = msg.frequency
             self.light_time = msg.light_time
             self.start_time = msg.start_time
-            delay = self.owner.qchannels[f'{self.another.owner.name}'].distance / SPEED_OF_LIGHT
+            delay = self.another.owner.qchannels[f'{self.owner.name}'].distance / SPEED_OF_LIGHT 
+            # self.owner.qchannels[f'{self.another.owner.name}'].distance / SPEED_OF_LIGHT
 
             # self.times = []
             end = self.start_time + int(self.light_time * 1e12) + delay + 5000  # wait for 5000 ps after last pulse
@@ -261,7 +277,8 @@ class DPS(StackProtocol):
             self.owner.timeline.schedule(event)
 
         elif msg.msg_type is DPSMsgType.KEY_PROPAGATION:
-            print(f"{self.owner.name} received key propogation message with key: {msg.key}")
+            # print(f"{self.owner.name} received key propogation message with key: {msg.key}")
+            pass
 
         # Alice receives detection times
         elif msg.msg_type is DPSMsgType.DETECTION_TIME:
@@ -325,7 +342,8 @@ class DPS(StackProtocol):
                 self.key += bits
                 # print(self.key,"key now")
                 self.key_bits = []
-                print(len(self.key),self.key_length)
+                # print(len(self.key),self.key_length)
+
                 if self.owner.aliceKey == '':
                     self.owner.aliceKey = self.key
                 # print("ALICE KEY:", self.owner.aliceKey) 

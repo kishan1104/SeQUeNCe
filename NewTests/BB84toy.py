@@ -8,7 +8,7 @@ from sequence.components.detector import Detector
 import numpy as np
 from sequence.kernel.process import Process
 from sequence.kernel.event import Event
-
+from sympy import sqrt, pi, cos, sin
 
 
 tl = Timeline()
@@ -45,14 +45,16 @@ class Bob(Node):
 
 # b = Bob("bob",tl)
 
-numpulse = round(1 * 10)
+# numpulse = round(1 * 10)
 
-from sequence.utils.encoding import polarization
+# from sequence.utils.encoding import polarization
 
-basislist = np.random.choice([0,1],numpulse)
-bitlist = np.random.choice([0,1],numpulse)
-print(basislist)
-print(bitlist)
-print('----------------')
+# basislist = np.random.choice([0,1],numpulse)
+# bitlist = np.random.choice([0,1],numpulse)
+# print(basislist)
+# print(bitlist)
+# print('----------------')
 
-print((polarization['bases'][basislist[0]])[bitlist[0]])
+# print((polarization['bases'][basislist[0]])[bitlist[0]])
+
+print(sin(np.radians(90)))
