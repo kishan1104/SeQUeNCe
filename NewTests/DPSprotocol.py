@@ -15,13 +15,46 @@ from sympy import sqrt,pi, cos, sin
 # =========================================================
 # Pair function
 # =========================================================
-def pair_dps_protocols(alice, bob):
+def pair_dps_protocols(alice, bob,eve=None):
     alice.another = bob
     bob.another = alice
     alice.role = 0
     bob.role = 1
+    alice.eve = None
+    bob.eve = None
+    if eve:
+        alice.eve = eve
+        bob.eve = eve
+        eve.another = bob
     # print(f"Paired {alice.owner.name}'s {alice.name} with {bob.owner.name}'s {bob.name}")
 
+def createState(phases=None):
+    if phases is not None:
+        state = [complex(sqrt(1/3))]
+        for ph in phases[1:]:
+            state.append(ph * complex(sqrt(1/3)))
+        return tuple(state), phases
+    
+    state = [complex(sqrt(1/3))]
+    sentstate = []
+    phases = [1]
+    for ph in range(2):
+        phvalue = np.random.choice([1,-1])   
+        state.append(phvalue * complex(sqrt(1/3)))
+        sentstate.append((phvalue))
+        phases.append(phvalue)
+    # self.phase_list.append(phases)
+    if np.random.random() <= 0:
+            chosen = np.random.choice([1,2])
+            r = np.random.random()
+            if r < 0.5:
+                delta = np.random.uniform(0, pi/4)
+            elif r < 0.75:
+                delta = np.random.uniform(0, pi/2)
+            else:
+                delta = np.random.uniform(0,pi)
+            state[chosen] = state[chosen] * (cos(delta) + 1j*sin(delta))
+    return tuple(state), phases
 # =========================================================
 # Message Types
 # =========================================================
@@ -76,7 +109,8 @@ class DPS(StackProtocol):
         self.bob_results = []
         self.corrected_key_indeces = []
         self.times = []
-        self.another = None
+        self.slots = []
+        # self.another = None
 
         self.key_length = 0
 
@@ -164,36 +198,14 @@ class DPS(StackProtocol):
         # print(self.owner.components)
 
         send_time = self.owner.timeline.now()
-
+        self.send_times.append(self.owner.timeline.now())
         # print(f"{self.owner.name} emitting pulse at time {send_time} ps")
-        self.send_times.append(send_time)
         
-        state = [complex(sqrt(1/3))]
-        sentstate = []
-        phases = [1]
-        for ph in range(2):
-            phvalue = np.random.choice([1,-1])   
-            # phase = cos(phvalue) + 1j*sin(phvalue)
-            # print(f"Chosen phase for pulse {phvalue}: {phase} radians")
-            # print(f"State contribution for pulse {phvalue}: {phase * complex(sqrt(1/3))}")
-            state.append(phvalue * complex(sqrt(1/3)))
-            sentstate.append((phvalue))
-            phases.append(phvalue)
+        
+        state, phases = createState()
         self.phase_list.append(phases)
-        if self.owner.get_generator().random() <= 0:
-                chosen = np.random.choice([1,2])
-                r = self.owner.get_generator().random()
-                if r < 0.5:
-                    delta = np.random.uniform(0, pi/4)
-                elif r < 0.75:
-                    delta = np.random.uniform(0, pi/2)
-                else:
-                    delta = np.random.uniform(0,pi)
-                state[chosen] = state[chosen] * (cos(delta) + 1j*sin(delta))
-                # print(f"Introducing noise to pulse {chosen} with delta {delta} radians, resulting in state contribution: {state[chosen]}") 
-        ls.emit([tuple(state)])
+        ls.emit([state])
         self.total_emmited += 1
-        # print(f"Emitted pulse {self.total_emmited} at time {send_time} ps")
 # =========================================================
 # Bob detector input (only time)
 # =========================================================
@@ -210,7 +222,14 @@ class DPS(StackProtocol):
     def sendQubit(self,photon):
         if self.role == 1:
             return
-
+        
+        if self.eve:
+            self.owner.send_qubit(self.eve.owner.name, photon)
+        else:
+            self.owner.send_qubit(self.another.owner.name, photon)
+    
+    def sendEveQubit(self,photon):
+        # print('recived photon to send to bob')
         self.owner.send_qubit(self.another.owner.name, photon)
         
 # =========================================================
@@ -223,8 +242,12 @@ class DPS(StackProtocol):
         bob_key = []
         # print("length of bob results",len(self.times))
         count = 0
+        # print(f"bob results: {self.bob_results}")
         for t, det in self.bob_results:
-            delay = self.another.owner.qchannels[self.owner.name].distance / SPEED_OF_LIGHT
+            if self.eve:
+                delay = self.eve.owner.qchannels[self.owner.name].distance / SPEED_OF_LIGHT
+            else:
+                delay = self.another.owner.qchannels[self.owner.name].distance / SPEED_OF_LIGHT
             t = t - delay
             bin_seperation = 1400
             slot = (t%10000)//bin_seperation
@@ -250,7 +273,7 @@ class DPS(StackProtocol):
             self.another.name,
             times=self.times
         )
-
+        # print(f"slots: {self.slots}")
         self.owner.send_message(self.another.owner.name, msg)
 
 
@@ -265,7 +288,10 @@ class DPS(StackProtocol):
             self.ls_freq = msg.frequency
             self.light_time = msg.light_time
             self.start_time = msg.start_time
-            delay = self.another.owner.qchannels[f'{self.owner.name}'].distance / SPEED_OF_LIGHT 
+            if self.eve:
+                delay = self.eve.owner.qchannels[f'{self.owner.name}'].distance / SPEED_OF_LIGHT
+            else:
+                delay = self.another.owner.qchannels[f'{self.owner.name}'].distance / SPEED_OF_LIGHT 
             # self.owner.qchannels[f'{self.another.owner.name}'].distance / SPEED_OF_LIGHT
 
             # self.times = []
@@ -288,8 +314,12 @@ class DPS(StackProtocol):
 
             # print("Alice received times:", msg.times)
             # print("Alice send times    :", self.send_times)
+            # print("Alice send times    :", self.send_times)
             # print(len(msg.times), "detection times received",self.owner.timeline.now())
-            self.distance = self.owner.qchannels[f'{self.another.owner.name}'].distance
+            if self.eve:
+                self.distance = self.owner.qchannels[f'{self.eve.owner.name}'].distance
+            else:
+                self.distance = self.owner.qchannels[f'{self.another.owner.name}'].distance
             delay = self.distance / SPEED_OF_LIGHT
             # print("Distance:", self.distance, "m, Delay:", delay, "ps")
             msg.times = [int(t - delay) for t in msg.times]
@@ -299,9 +329,11 @@ class DPS(StackProtocol):
             # print(len(self.phase_list), "Alice phase list")
             # print(len(self.key_bits), "Alice key bits before processing detection times")
             for t in msg.times:
+                # print("Processing detection time:", t, "ps")
                 while idx < len(self.send_times):
+                    # print("Match found:", t - self.send_times[idx], idx)
                     if t - self.send_times[idx]  <= 4200 and t - self.send_times[idx] >= 0:
-                        # print(4200, t - self.send_times[idx], idx)
+                        
                         break
                         # print(self.send_times[idx]-t, t, self.send_times[idx],t)
                     idx += 1

@@ -48,21 +48,7 @@ def estimate_qber(alice_key, bob_key, sample_size):
     )
 
     qber = errors / len(indices)
-
-    # Remove revealed bits
-    remaining_alice = [
-        bit for i, bit in enumerate(alice_key)
-        if i not in indices
-    ]
-
-    remaining_bob = [
-        bit for i, bit in enumerate(bob_key)
-        if i not in indices
-    ]
-
-    return qber, remaining_alice, remaining_bob
-
-
+    return qber
 
 def CreateNetwork(numberofnodes,tl, nodeType:Node):
     nodes = []
