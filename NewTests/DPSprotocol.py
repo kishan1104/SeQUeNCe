@@ -198,7 +198,7 @@ class DPS(StackProtocol):
         # print(self.owner.components)
 
         send_time = self.owner.timeline.now()
-        self.send_times.append(self.owner.timeline.now())
+        self.send_times.append(send_time)
         # print(f"{self.owner.name} emitting pulse at time {send_time} ps")
         
         
@@ -222,10 +222,13 @@ class DPS(StackProtocol):
     def sendQubit(self,photon):
         if self.role == 1:
             return
-        
+        # print('Alice send qubit to ', self.another.owner.name)
         if self.eve:
+            # print('Alice send qubit to Eve', self.eve.owner.name)
             self.owner.send_qubit(self.eve.owner.name, photon)
         else:
+            # print('Alice send qubit to ', self.another.owner.name)
+
             self.owner.send_qubit(self.another.owner.name, photon)
     
     def sendEveQubit(self,photon):

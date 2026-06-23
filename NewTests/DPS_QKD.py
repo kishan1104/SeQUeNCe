@@ -222,11 +222,11 @@ def qber_with_eve(n):
 #         nwtnodes[i].run()
 #         tm.run()
 
-nwtnodes, nodes, timelines = qber_with_eve(100)
+nwtnodes, nodes, timelines = test(100)
 
 for i,tm in enumerate(timelines):
         tm.init()
-        nwtnodes[i][0].push(128)
+        nwtnodes[i].run()
         tm.run()
 
 
@@ -262,7 +262,7 @@ eve.protocols[0] = eve_dps
 
 
 tl.init()
-alice_dps.push(64)
+# alice_dps.push(64)
 tl.run()
 
 tl2 = Timeline()
@@ -284,7 +284,7 @@ alice2.protocols[0] = alice2_dps
 bob2.protocols[0] = bob2_dps
 
 tl2.init()
-# alice2_dps.push(128)
+alice2_dps.push(128)
 tl2.run()
 
 
@@ -293,12 +293,12 @@ tl2.run()
 # timeline.run()
 
 
-print(alice.aliceKey)
-print(bob.bobKey)
+# print(alice.aliceKey)
+# print(bob.bobKey)
 # print(eve.eve_key)
 
-# print(alice2.aliceKey)
-# print(bob2.bobKey)
+print(alice2.aliceKey)
+print(bob2.bobKey)
 # print(eve.eve_key)
 
 # needed_keys = [('N0','N11'),('N2','N41')]

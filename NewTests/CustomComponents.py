@@ -20,6 +20,7 @@ from sequence.utils.encoding import time_bin
 from sequence.utils.encoding import polarization
 from sequence.utils import log
 from sequence.constants import SPEED_OF_LIGHT
+from sympy import sqrt,pi, cos, sin
 
 
 def createState(phases=None):
@@ -33,7 +34,7 @@ def createState(phases=None):
 
 class CLightSource(LightSource):
     def __init__(self, name, timeline, frequency=8e7, wavelength=1550, bandwidth=0, mean_photon_num=0.1,
-                 encoding_type=polarization, phase_error=0):
+                 encoding_type=polarization, phase_error=0.2):
         super().__init__(name, timeline, frequency, wavelength, bandwidth, mean_photon_num, encoding_type, phase_error)
     
 
@@ -56,17 +57,32 @@ class CLightSource(LightSource):
             num_photons = self.get_generator().poisson(self.mean_photon_num)
             # print("state before error:", state)
             if self.get_generator().random() < self.phase_error:
+                
+            #     # print("phase error applied")
+            #     error = self.get_generator().choice([0, 1, 2])
 
-                error = self.get_generator().choice([0, 1, 2])
+            #     if error == 0:
+            #         state = multiply([1, -1, 1], state)
+
+            #     elif error == 1:
+            #         state = multiply([1, 1, -1], state)
+
+            #     else:
+            #         state = multiply([1, -1, -1], state)
+                error = self.get_generator().choice([0,1,2,3])
 
                 if error == 0:
-                    state = multiply([1, -1, 1], state)
+                    pass                    # identity
 
                 elif error == 1:
-                    state = multiply([1, 1, -1], state)
+                    state = multiply([1,-1,1], state)
+
+                elif error == 2:
+                    state = multiply([1,1,-1], state)
 
                 else:
-                    state = multiply([1, -1, -1], state)
+                    state = multiply([1,-1,-1], state)
+
             # print("state after error:", state)
             for _ in range(num_photons):
                 wavelength = self.linewidth * self.get_generator().standard_normal() + self.wavelength
@@ -279,9 +295,9 @@ class EveDPSNode(QKDNode):
 
     def receive_qubit(self, src, qubit):
         state = qubit.quantum_state.state
-        bit, time = self.measure_state(state)
+        bit, time, slot = self.measure_state(state)
         self.eve_key.append((bit, time,))
-        resend_state = self.make_resend_state(bit)
+        resend_state = self.make_resend_state(bit,slot)
         # print(detector,time, "Eve detected a photon!")
         photon = Photon(str(self.counter), self.timeline, encoding_type=time_bin, quantum_state=resend_state)
         for p in self.protocols:
@@ -315,11 +331,12 @@ class EveDPSNode(QKDNode):
                 # time t
                 time = 0
                 detector_num = self.get_generator().choice([0,1])
+                slot = 0
 
             elif r < 0.5:
                 # -------- first interference (E,M) --------
                 time = self.path_difference
-
+                slot = 1
                 # constructive / destructive
                 if abs(a + b) > abs(a - b):
                     # print('constructive',time)
@@ -331,6 +348,7 @@ class EveDPSNode(QKDNode):
                     detector_num = 1
 
             elif r < 1 - p_late:
+                slot = 2
                 # -------- second interference (M,L) --------
                 time = 2 * self.path_difference
 
@@ -344,44 +362,106 @@ class EveDPSNode(QKDNode):
                     # print('destructive M,L',time)
             else:
                 # time t+3T
+                slot = 3
                 time = 3 * self.path_difference
                 detector_num = self.get_generator().choice([0,1])
 
-            return int(detector_num), time+self.timeline.now()
+            return int(detector_num), time+self.timeline.now(),slot
+        
+    def createState(self,phases=None):
+        if phases is not None:
+            state = [complex(sqrt(1/3))]
+            for ph in phases[1:]:
+                state.append(ph * complex(sqrt(1/3)))
+            return tuple(state)
+        
+        state = [complex(sqrt(1/3))]
+        sentstate = []
+        phases = [1]
+        for ph in range(2):
+            phvalue = np.random.choice([1,-1])   
+            state.append(phvalue * complex(sqrt(1/3)))
+            sentstate.append((phvalue))
+            phases.append(phvalue)
+        # self.phase_list.append(phases)
+        if np.random.random() <= 0:
+                chosen = np.random.choice([1,2])
+                r = np.random.random()
+                if r < 0.5:
+                    delta = np.random.uniform(0, pi/4)
+                elif r < 0.75:
+                    delta = np.random.uniform(0, pi/2)
+                else:
+                    delta = np.random.uniform(0,pi)
+                state[chosen] = state[chosen] * (cos(delta) + 1j*sin(delta))
+        return tuple(state)
+    
 
-    def make_resend_state(self, bit):
+    def make_resend_state(self, bit,slot):
 
         amp = np.sqrt(1/3)
         choice = self.get_generator().choice([0,1])
-        if choice == 0:
+        if slot == 1:
 
             if bit == 0:
-                return (
-                    amp,
-                    amp,
-                    amp
-                )
+                
+                if choice == 0:
+                    return (
+                        amp,
+                        amp,
+                        amp
+                    )
+                else:
+                    return (
+                        amp,
+                        amp,
+                        -amp
+                    )
+            else:
+                if choice == 0:
+                    return (
+                        amp,
+                        -amp,
+                        amp
+                    )
+                else:
+                    return (
+                        amp,
+                        -amp,
+                        -amp
+                    )
 
-            return (
-                amp,
-                -amp,
-                amp
-            )
 
+        elif slot == 2:
+
+            if bit == 0:
+                if choice == 0:
+                    return (
+                        amp,
+                        amp,
+                        amp
+                    )
+                else:
+                    return (
+                        amp,
+                        -amp,
+                        -amp
+                    )
+            else:
+                if choice == 0:
+                    return (
+                        amp,
+                        -amp,
+                        amp
+                    )
+                else:
+                    return (
+                        amp,
+                        amp,
+                        -amp
+                    )
         else:
-
-            if bit == 0:
-                return (
-                    amp,
-                    amp,
-                    amp
-                )
-
-            return (
-                amp,
-                amp,
-                -amp
-            )
+            return self.createState()
 
     def send_qubit(self, dst, qubit):
         # print(f"{self.name} is sending a qubit at time {self.timeline.now()} with state {qubit.quantum_state.state}")
