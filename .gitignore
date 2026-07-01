@@ -151,3 +151,6 @@ utils/json_config_generators/*.json
 
 # docstring files
 *.rst
+
+# ignore folders
+/Visualization

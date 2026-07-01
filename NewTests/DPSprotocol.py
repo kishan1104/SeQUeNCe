@@ -110,6 +110,7 @@ class DPS(StackProtocol):
         self.corrected_key_indeces = []
         self.times = []
         self.slots = []
+        self.pulse_interval = 10000
         # self.another = None
 
         self.key_length = 0
@@ -177,10 +178,10 @@ class DPS(StackProtocol):
         state_list = []
         # self.phase_list = []
         time = self.start_time
-        pulse_interval = int(1e12 / self.ls_freq)
+        self.pulse_interval = int(1e12 / self.ls_freq)
         for i in range(num):
 
-            time += pulse_interval
+            time += self.pulse_interval
 
             process = Process(self, "emit_single", [])
             event = Event(time, process)
@@ -253,7 +254,7 @@ class DPS(StackProtocol):
                 delay = self.another.owner.qchannels[self.owner.name].distance / SPEED_OF_LIGHT
             t = t - delay
             bin_seperation = 1400
-            slot = (t%10000)//bin_seperation
+            slot = (t%self.pulse_interval)//bin_seperation
             if slot == 1 or slot == 2:
                 count += 1
                 if det == f'{self.owner.name}.detector0':

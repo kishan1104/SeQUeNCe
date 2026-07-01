@@ -34,7 +34,7 @@ def createState(phases=None):
 
 class CLightSource(LightSource):
     def __init__(self, name, timeline, frequency=8e7, wavelength=1550, bandwidth=0, mean_photon_num=0.1,
-                 encoding_type=polarization, phase_error=0.2):
+                 encoding_type=polarization, phase_error=0):
         super().__init__(name, timeline, frequency, wavelength, bandwidth, mean_photon_num, encoding_type, phase_error)
     
 
@@ -57,7 +57,7 @@ class CLightSource(LightSource):
             num_photons = self.get_generator().poisson(self.mean_photon_num)
             # print("state before error:", state)
             if self.get_generator().random() < self.phase_error:
-                
+                state = multiply([1, -1, 1], state)
             #     # print("phase error applied")
             #     error = self.get_generator().choice([0, 1, 2])
 
@@ -69,19 +69,19 @@ class CLightSource(LightSource):
 
             #     else:
             #         state = multiply([1, -1, -1], state)
-                error = self.get_generator().choice([0,1,2,3])
+                # error = self.get_generator().choice([0,1,2,3])
 
-                if error == 0:
-                    pass                    # identity
+                # if error == 0:
+                #     pass                    # identity
 
-                elif error == 1:
-                    state = multiply([1,-1,1], state)
+                # elif error == 1:
+                #     state = multiply([1,-1,1], state)
 
-                elif error == 2:
-                    state = multiply([1,1,-1], state)
+                # elif error == 2:
+                #     state = multiply([1,1,-1], state)
 
-                else:
-                    state = multiply([1,-1,-1], state)
+                # else:
+                #     state = multiply([1,-1,-1], state)
 
             # print("state after error:", state)
             for _ in range(num_photons):
@@ -193,7 +193,7 @@ class DPSNode(QKDNode):
                                 encoding_type=time_bin)
         self.aliceKey = ''
         self.bobKey = ''
-        self.eve_key = ''
+        self.eveKey = ''
         self.dpskeys = {}
         self.add_component(self.source)
         self.source.add_receiver(self)
@@ -258,7 +258,7 @@ class DPSNode(QKDNode):
 
 
 class EveDPSNode(QKDNode):
-    def __init__(self, name, timeline, seed=None, ):
+    def __init__(self, name, timeline, attack='', seed=None, ):
         super().__init__(name, timeline, seed=seed,)
         self.source = CLightSource(name = name+'light_source',
                                 timeline=timeline,
@@ -267,7 +267,7 @@ class EveDPSNode(QKDNode):
                                 encoding_type=time_bin)
         self.aliceKey = ''
         self.bobKey = ''
-        self.eve_key = []
+        self.eveKey = []
         self.dpskeys = {}
         self.add_component(self.source)
         self.source.add_receiver(self)
@@ -281,6 +281,7 @@ class EveDPSNode(QKDNode):
         self.detectors[1].add_receiver(self)
         self.counter = 0
         self.path_difference = time_bin["bin_separation"]
+        self.attack = attack
 
     def init(self):
         pass
@@ -294,12 +295,30 @@ class EveDPSNode(QKDNode):
         self.protocols[0].sendQubit(photon)
 
     def receive_qubit(self, src, qubit):
-        state = qubit.quantum_state.state
-        bit, time, slot = self.measure_state(state)
-        self.eve_key.append((bit, time,))
-        resend_state = self.make_resend_state(bit,slot)
-        # print(detector,time, "Eve detected a photon!")
-        photon = Photon(str(self.counter), self.timeline, encoding_type=time_bin, quantum_state=resend_state)
+        if self.attack == '':
+            self.send_to_Protocol(qubit)
+            return
+        elif self.attack == 'IR':
+
+
+            state = qubit.quantum_state.state
+            bit, time, slot = self.measure_state(state)
+            self.eveKey.append((bit, time,))
+            resend_state = self.make_resend_state(bit,slot)
+            # print(detector,time, "Eve detected a photon!")
+            photon = Photon(str(self.counter), self.timeline, encoding_type=time_bin, quantum_state=resend_state)
+            self.send_to_Protocol(photon)
+            return
+        elif self.attack == 'PNS':
+            r = self.get_generator().random()
+            if r < 1:
+                state = qubit.quantum_state.state
+                bit,time,slot = self.measure_state(state)
+                self.eveKey.append((bit,time))
+            
+            self.send_to_Protocol(qubit)
+
+    def send_to_Protocol(self,photon):
         for p in self.protocols:
             # print("protocol:", p.name)
             if p == "BB84":
@@ -481,7 +500,7 @@ class EveDPSNode(QKDNode):
         #     else:
         #         # print(f"Unknown protocol {p.name} at node {self.name}; cannot handle photon detection.")
         #         pass
-        self.eve_key.append((detector, time))
+        self.eveKey.append((detector, time))
         resend_state = self.make_resend_state(detector)
         # print(detector,time, "Eve detected a photon!")
         photon = Photon(str(self.counter), self.timeline, encoding_type=time_bin, quantum_state=resend_state)

@@ -181,7 +181,7 @@ def test(n):
     return nodenwt,nodes,timelines
 
 
-def qber_with_eve(n):
+def qber_with_eve(n,attack=''):
     nodes = []
     timelines = []
     nwtnodes = []
@@ -189,7 +189,7 @@ def qber_with_eve(n):
         tim = Timeline()
         alice = DPSNode('Alice', tim)
         bob = DPSNode('Bob', tim)
-        eve = EveDPSNode('Eve', tim)
+        eve = EveDPSNode('Eve', tim,attack=attack)
 
         qc1 = QuantumChannel('qc_Alice_Eve', tim, attenuation=0.0002, distance=1000)
         qc1.set_ends(alice, eve.name)
@@ -222,13 +222,18 @@ def qber_with_eve(n):
 #         nwtnodes[i].run()
 #         tm.run()
 
-nwtnodes, nodes, timelines = test(100)
+# nwtnodes, nodes, timelines = test(100)
 
+# for i,tm in enumerate(timelines):
+#         tm.init()
+#         nwtnodes[i].run()
+#         tm.run()
+
+nwtnodes, nodes, timelines = qber_with_eve(1,'PNS')
 for i,tm in enumerate(timelines):
         tm.init()
-        nwtnodes[i].run()
+        nwtnodes[i][0].push(128)
         tm.run()
-
 
 
 tl = Timeline()
@@ -297,8 +302,8 @@ tl2.run()
 # print(bob.bobKey)
 # print(eve.eve_key)
 
-print(alice2.aliceKey)
-print(bob2.bobKey)
+# print(alice2.aliceKey)
+# print(bob2.bobKey)
 # print(eve.eve_key)
 
 # needed_keys = [('N0','N11'),('N2','N41')]
@@ -319,6 +324,9 @@ def print_keys_and_qber(nodes:list[Node]):
             qber = calculate_qber(node[0].aliceKey, node[1].bobKey[:len(node[0].aliceKey)])
             print(f"quber of {i}", qber)
             quber_list.append(qber)
+        print("alice_Key=",node[0].aliceKey)
+        print(f'bob_key={node[1].bobKey}')
+        print(f'eve_key={''.join(str(key[0]) for key in node[2].eveKey)}')
     print("average qber:", sum(quber_list)/len(quber_list))
 
     
