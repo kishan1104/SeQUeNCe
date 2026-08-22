@@ -2,10 +2,10 @@
 import json
 
 
-from NewTests.DPSprotocol import DPSMsgType
+from DPS_QKD.DPSprotocol import DPS, DPSMsgType
 from sequence.message import Message
 from sequence.topology.node import QKDNode
-
+from sequence.qkd.cascade import Cascade
 from sequence.components.detector import Detector
 from sequence.components.interferometer import Interferometer
 from sequence.components.photon import Photon
@@ -34,7 +34,7 @@ def createState(phases=None):
 
 class CLightSource(LightSource):
     def __init__(self, name, timeline, frequency=8e7, wavelength=1550, bandwidth=0, mean_photon_num=0.1,
-                 encoding_type=polarization, phase_error=0):
+                 encoding_type=polarization, phase_error=0.2):
         super().__init__(name, timeline, frequency, wavelength, bandwidth, mean_photon_num, encoding_type, phase_error)
     
 
@@ -56,34 +56,12 @@ class CLightSource(LightSource):
         for i, state in enumerate(state_list):
             num_photons = self.get_generator().poisson(self.mean_photon_num)
             # print("state before error:", state)
+
+            
             if self.get_generator().random() < self.phase_error:
                 state = multiply([1, -1, 1], state)
-            #     # print("phase error applied")
-            #     error = self.get_generator().choice([0, 1, 2])
 
-            #     if error == 0:
-            #         state = multiply([1, -1, 1], state)
 
-            #     elif error == 1:
-            #         state = multiply([1, 1, -1], state)
-
-            #     else:
-            #         state = multiply([1, -1, -1], state)
-                # error = self.get_generator().choice([0,1,2,3])
-
-                # if error == 0:
-                #     pass                    # identity
-
-                # elif error == 1:
-                #     state = multiply([1,-1,1], state)
-
-                # elif error == 2:
-                #     state = multiply([1,1,-1], state)
-
-                # else:
-                #     state = multiply([1,-1,-1], state)
-
-            # print("state after error:", state)
             for _ in range(num_photons):
                 wavelength = self.linewidth * self.get_generator().standard_normal() + self.wavelength
                 new_photon = Photon(str(i), self.timeline,
@@ -184,9 +162,9 @@ class CInterferometer(Interferometer):
         self.timeline.schedule(event)
 
 class DPSNode(QKDNode):
-    def __init__(self, name, timeline, seed=None, ):
-        super().__init__(name, timeline, seed=seed,)
-        self.source = CLightSource(name = name+'light_source',
+    def __init__(self, name, timeline, seed=None, stack_size = 5):
+        super().__init__(name, timeline, seed=seed,stack_size=stack_size)
+        source = CLightSource(name = name+'.light_source',
                                 timeline=timeline,
                                 frequency=1e6,
                                 mean_photon_num=0.2,
@@ -195,17 +173,30 @@ class DPSNode(QKDNode):
         self.bobKey = ''
         self.eveKey = ''
         self.dpskeys = {}
-        self.add_component(self.source)
-        self.source.add_receiver(self)
+        self.add_component(source)
+        source.add_receiver(self)
         self.detectors = [CDetector(name + ".detector" + str(i), timeline) for i in range(2)]
         self.interferometer = CInterferometer(name + ".interferometer", timeline, time_bin["bin_separation"])
         self.interferometer.add_receiver(self.detectors[0])
         self.interferometer.add_receiver(self.detectors[1])
+        self.add_component(self.interferometer)
         self.timestamps = []
         self.comps = [self.interferometer] + self.detectors
         self.detectors[0].add_receiver(self)
         self.detectors[1].add_receiver(self)
         self.counter = 0
+        ls_name = name + ".light_source"
+        if stack_size > 0:
+            # print('this is run')
+            self.protocols = []
+            self.protocol_stack[0] = DPS(self, name + ".DPS", ls_name)
+            self.protocols.append(self.protocol_stack[0])
+        if stack_size > 1:
+            # Create cascade protocol
+            self.protocol_stack[1] = Cascade(self, name + ".cascade")
+            self.protocols.append(self.protocol_stack[1])
+            self.protocol_stack[0].upper_protocols.append(self.protocol_stack[1])
+            self.protocol_stack[1].lower_protocols.append(self.protocol_stack[0])
 
     def init(self):
         pass
@@ -213,6 +204,7 @@ class DPSNode(QKDNode):
 
     def get(self, photon,**kwargs):
         self.issent = True
+        # print(self.protocols)
         # print(self.qchannels[bob.name])
         # self.qchannels[bob.name].transmit(photon,self)
         # print(f"{self.name} is sending a qubit at time {self.timeline.now()} with state {photon.quantum_state.state}")
@@ -227,7 +219,7 @@ class DPSNode(QKDNode):
         for p in self.protocols:
             if p == "BB84":
                 print("BB84 protocol not yet implemented for QKDNode; skipping photon detection handling.")
-            elif p.name == "dps":
+            elif p.name == self.name+".DPS":
                 if hasattr(p, "pop"):
                     p.pop(detector, time)
             # if hasattr(p, "pop"):
@@ -245,14 +237,17 @@ class DPSNode(QKDNode):
         # print(f"{self.name} is propogating key {msg.keyname} with xorKey {msg.xorKey}")
         self.dpskeys[msg.keyname] =''.join(str(int(a) ^ int(b)) for a, b in zip(msg.key, self.dpskeys[msg.xorKey]))
 
-    def receive_message(self, src, msg):
+    def receive_message(self, src: str, msg: "Message") -> None:
+        # signal to protocol that we've received a message
+        for protocol in self.protocols:
+            print('message i')
+            if getattr(protocol, "protocol_type", None) or type(protocol) == msg.protocol_type:
+                protocol.received_message(src, msg)
+                return
 
-        if msg.msg_type is DPSMsgType.KEY_PROPAGATION:
-            self.propogate_key(msg)
-            # print(f"{self.name} received key propogation message with key: {msg.key}, keyname: {msg.keyname}, xorKey: {msg.xorKey}")
-        else:
-            self.protocols[0].received_message(src, msg)
-            # print(f"{self.name} received message of type {msg.msg_type} with content: {msg.payload}")
+        # if we reach here, we didn't successfully receive the message in any protocol
+        print(self.protocols)
+        raise Exception(f"Message received for unknown protocol '{msg.protocol_type}' on node {self.name}")
 
 
 
@@ -260,7 +255,7 @@ class DPSNode(QKDNode):
 class EveDPSNode(QKDNode):
     def __init__(self, name, timeline, attack='', seed=None, ):
         super().__init__(name, timeline, seed=seed,)
-        self.source = CLightSource(name = name+'light_source',
+        source = CLightSource(name = name+'light_source',
                                 timeline=timeline,
                                 frequency=1e6,
                                 mean_photon_num=0.2,
@@ -269,8 +264,8 @@ class EveDPSNode(QKDNode):
         self.bobKey = ''
         self.eveKey = []
         self.dpskeys = {}
-        self.add_component(self.source)
-        self.source.add_receiver(self)
+        self.add_component(source)
+        source.add_receiver(self)
         self.detectors = [CDetector(name + ".detector" + str(i), timeline) for i in range(2)]
         self.interferometer = CInterferometer(name + ".interferometer", timeline, time_bin["bin_separation"])
         self.interferometer.add_receiver(self.detectors[0])
@@ -323,7 +318,7 @@ class EveDPSNode(QKDNode):
             # print("protocol:", p.name)
             if p == "BB84":
                 print("BB84 protocol not yet implemented for QKDNode; skipping photon detection handling.")
-            elif p.name == "dps2":
+            elif p.name == self.name+".DPS":
                 if hasattr(p, "sendEveQubit"):
                     p.sendEveQubit(photon)
             # if hasattr(p, "pop"):
@@ -510,7 +505,7 @@ class EveDPSNode(QKDNode):
             # print("protocol:", p.name)
             if p == "BB84":
                 print("BB84 protocol not yet implemented for QKDNode; skipping photon detection handling.")
-            elif p.name == "dps2":
+            elif p.name == self.name + ".DPS":
                 if hasattr(p, "sendEveQubit"):
                     p.sendEveQubit(photon)
             # if hasattr(p, "pop"):

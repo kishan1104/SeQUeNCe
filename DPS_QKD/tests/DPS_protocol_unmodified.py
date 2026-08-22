@@ -1,5 +1,7 @@
 # from NewTests.DPS_QKD import DPSKeyMessage
 # from jupyter_server_terminals import msg
+import math
+
 import numpy as np
 from enum import Enum, auto
 from numpy import sqrt
@@ -112,19 +114,20 @@ class DPS(StackProtocol):
         self.slots = []
         self.pulse_interval = 10000
         # self.another = None
-
+        self.error_rates = []
         self.key_length = 0
 
 
 # =========================================================
 # push() start key generation
 # =========================================================
-    def push(self, length):
+    def push(self, length,key_num = 1,run_time = math.inf):
 
         if self.role != 0:
             raise Exception("Only Alice starts DPS")
 
         self.key_length = length
+        self.another.key_length = length
         self.send_times = []
         self.phase_list = []
         self.key_bits = []
@@ -132,7 +135,7 @@ class DPS(StackProtocol):
         self.times = []
         self.working = True
         self.another.working = True
-        # print("called push")
+        print("called push",self)
         self.start_protocol()
 
 
@@ -197,7 +200,7 @@ class DPS(StackProtocol):
 
         ls = self.owner.components[self.ls_name]
         # print(self.owner.components)
-
+        # print(ls.encoding_type)
         send_time = self.owner.timeline.now()
         self.send_times.append(send_time)
         # print(f"{self.owner.name} emitting pulse at time {send_time} ps")
@@ -258,9 +261,9 @@ class DPS(StackProtocol):
             if slot == 1 or slot == 2:
                 count += 1
                 if det == f'{self.owner.name}.detector0':
-                    self.bobkey.append(0)
+                    self.key_bits.append(0)
                 elif det == f'{self.owner.name}.detector1':
-                    self.bobkey.append(1)
+                    self.key_bits.append(1)
         # print("self is ", self.owner.name)
         # print("keybits:", self.bobkey)
         # print("Number of key bits:", count)
@@ -370,30 +373,50 @@ class DPS(StackProtocol):
             # print(self.key_bits,"self key")                 
             if self.key_bits:
                 # print("Alice key bits:", self.key_bits)
-                bits = ''
-                for bit in self.key_bits:
-                    # print(bit, end=' ')
-                    bits+=str(bit)
-                # print(bits)
-                self.key += bits
-                # print(self.key,"key now")
-                self.key_bits = []
+                # bits = ''
+                # for bit in self.key_bits:
+                #     # print(bit, end=' ')
+                #     bits+=str(bit)
+                # # print(bits)
+                # self.key += bits
+                # # print(self.key,"key now")
+                # self.key_bits = []
                 # print(len(self.key),self.key_length)
-
+                print(type(self.key_bits[0]))
+                self.set_key()
+                self.another.set_key()
                 if self.owner.aliceKey == '':
                     self.owner.aliceKey = self.key
+                    # print('upper protocols', self.lower_protocols)
+                    # print(self)
+                    self._pop(info=self.key)
+                    self.another._pop(info = self.another.key)
+                    self.another.owner.bobKey = self.another.key
                 # print("ALICE KEY:", self.owner.aliceKey) 
             # self._pop(info=self.key)
+                key_diff = self.key ^ self.another.key
+                num_errors = 0
+                while key_diff:
+                    key_diff &= key_diff - 1
+                    num_errors += 1
+                self.error_rates.append(num_errors / self.key_lengths[0])
 
-            self.key_bits.clear()
+                self.keys_left_list[0] -= 1
+
+            self.last_key_time = self.owner.timeline.now()
+            # self.key_bits.clear()
 
 
 # =========================================================
 # Convert key bits
 # =========================================================
     def set_key(self):
-
         bits = self.key_bits[:self.key_length]
         self.key_bits = self.key_bits[self.key_length:]
-
         self.key = int("".join(str(b) for b in bits), 2)
+
+    # def set_bob_key(self):
+    #     bits = self.bobkey[:self.key_length]
+    #     self.bobkey = self.bobkey[self.key_length:]
+
+    #     self.key = int("".join(str(b) for b in bits), 2)

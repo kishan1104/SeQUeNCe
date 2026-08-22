@@ -57,7 +57,7 @@ def CreateNetwork(numberofnodes,tl, nodeType:Node):
         nodes.append(node)
     for i,node in enumerate(nodes):
         if i < numberofnodes - 1:
-            qc = QuantumChannel(f'qc_{node.name}_{nodes[i+1].name}', tl, attenuation=0.0002, distance=1000)
+            qc = QuantumChannel(f'qc_{node.name}_{nodes[i+1].name}', tl, attenuation=0.0002, distance=24000)
             # qc2 = QuantumChannel(f'qc_{nodes[i+1].name}_{node.name}', tl, attenuation=0, distance=1000)
             # qc2.set_ends(nodes[i+1], node.name)
             qc.set_ends(node, nodes[i+1].name)

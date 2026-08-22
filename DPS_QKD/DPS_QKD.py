@@ -1,14 +1,15 @@
 
 from sequence.kernel.timeline import Timeline
-from NewTests.DPSprotocol import DPSMessage,DPSMsgType
+from DPS_QKD.DPSprotocol import DPSMessage,DPSMsgType
 from sequence.topology.node import Node,QuantumRouter
 import numpy as np
 from sequence.kernel.process import Process
 from sequence.kernel.event import Event
-from NewTests.DPSprotocol import DPS,pair_dps_protocols,DPSMessage
+from DPS_QKD.DPSprotocol import DPS,pair_dps_protocols,DPSMessage
+from sequence.qkd.cascade import pair_cascade_protocols
 from sequence.constants import SPEED_OF_LIGHT
-from NewTests.Utility import calculate_qber, estimate_qber, CreateNetwork
-from NewTests.CustomComponents import DPSNode, ExtRouterNetTopo, EveDPSNode
+from DPS_QKD.Utility import calculate_qber, estimate_qber, CreateNetwork
+from DPS_QKD.CustomComponents import DPSNode, ExtRouterNetTopo, EveDPSNode
 from sequence.components.optical_channel import QuantumChannel, ClassicalChannel
 
 # tl = Timeline()
@@ -26,8 +27,8 @@ class Node3Net:
         self.timeline = timeline
     
     def GetKey(self,node1:QuantumRouter,node2:QuantumRouter):
-        self.alice_dps = DPS(node1,'dps1',node1.name+'light_source') 
-        self.bob_dps = DPS(node2,'dps',node2.name+'light_source') 
+        self.alice_dps = DPS(node1,'dps1',node1.name+'.light_source') 
+        self.bob_dps = DPS(node2,'dps',node2.name+'.light_source') 
         
         pair_dps_protocols(self.alice_dps,self.bob_dps)
         if len(node1.protocols) >= 1:
@@ -174,7 +175,7 @@ def test(n):
     for i in range(n):
         tim = Timeline()
         node = CreateNetwork(2, tim, DPSNode)
-        nwt = Node3Net(node, tim,256)
+        nwt = Node3Net(node, tim,2990)
         nodenwt.append(nwt)
         nodes.append(node)
         timelines.append(tim)
@@ -191,7 +192,7 @@ def qber_with_eve(n,attack=''):
         bob = DPSNode('Bob', tim)
         eve = EveDPSNode('Eve', tim,attack=attack)
 
-        qc1 = QuantumChannel('qc_Alice_Eve', tim, attenuation=0.0002, distance=1000)
+        qc1 = QuantumChannel('qc_Alice_Eve', tim, attenuation=0.0002, distance=40100)
         qc1.set_ends(alice, eve.name)
         qc2 = QuantumChannel('qc_Eve_Bob', tim, attenuation=0.0002, distance=0)
         qc2.set_ends(eve, bob.name)
@@ -201,9 +202,9 @@ def qber_with_eve(n,attack=''):
         cc2 = ClassicalChannel('cc_Bob_Alice', tim, 1000)
         cc2.set_ends(bob, alice.name)
 
-        alice_dps = DPS(alice,'dps1',alice.name+'light_source')
-        bob_dps = DPS(bob,'dps',bob.name+'light_source')
-        eve_dps = DPS(eve,'dps2',eve.name+'light_source')
+        alice_dps = DPS(alice,'dps1',alice.name+'.light_source')
+        bob_dps = DPS(bob,'dps',bob.name+'.light_source')
+        eve_dps = DPS(eve,'dps2',eve.name+'.light_source')
         pair_dps_protocols(alice_dps,bob_dps,eve_dps)
         alice.protocols[0] = alice_dps
         bob.protocols[0] = bob_dps
@@ -222,18 +223,18 @@ def qber_with_eve(n,attack=''):
 #         nwtnodes[i].run()
 #         tm.run()
 
-# nwtnodes, nodes, timelines = test(100)
+nwtnodes, nodes, timelines = test(1)
 
-# for i,tm in enumerate(timelines):
-#         tm.init()
-#         nwtnodes[i].run()
-#         tm.run()
-
-nwtnodes, nodes, timelines = qber_with_eve(1,'PNS')
 for i,tm in enumerate(timelines):
         tm.init()
-        nwtnodes[i][0].push(128)
+        nwtnodes[i].run()
         tm.run()
+
+# nwtnodes, nodes, timelines = qber_with_eve(100,'IR')
+# for i,tm in enumerate(timelines):
+#         tm.init()
+#         nwtnodes[i][0].push(128)
+#         tm.run()
 
 
 tl = Timeline()
@@ -253,9 +254,9 @@ cc2 = ClassicalChannel('cc_Bob_Alice', tl, 1000)
 cc2.set_ends(bob, alice.name)
 
 
-alice_dps = DPS(alice,'dps1',alice.name+'light_source')
-bob_dps = DPS(bob,'dps',bob.name+'light_source')
-eve_dps = DPS(eve,'dps2',eve.name+'light_source')
+alice_dps = DPS(alice,'dps1',alice.name+'.light_source')
+bob_dps = DPS(bob,'dps',bob.name+'.light_source')
+eve_dps = DPS(eve,'dps2',eve.name+'.light_source')
 pair_dps_protocols(alice_dps,bob_dps,eve_dps)
 alice.protocols[0] = alice_dps
 bob.protocols[0] = bob_dps
@@ -263,18 +264,34 @@ eve.protocols[0] = eve_dps
 
 
 
-
+class KeyManager():
+    def __init__(self, timeline, keysize, num_keys):
+        self.timeline = timeline
+        self.lower_protocols = []
+        self.keysize = keysize
+        self.num_keys = num_keys
+        self.keys = []
+        self.times = []
+        
+    def send_request(self):
+        for p in self.lower_protocols:
+            p.push(self.keysize, self.num_keys) # interface for cascade to generate keys
+            
+    def pop(self, key): # interface for cascade to return generated keys
+        self.keys.append(key)
+        self.times.append(self.timeline.now() * 1e-9)
+        print(f"KeyManager received key: {key} at time {self.timeline.now() * 1e-9} seconds")
 
 
 tl.init()
 # alice_dps.push(64)
 tl.run()
 
-tl2 = Timeline()
+tl2 = Timeline((1000*10000)*1e9)
 alice2 = DPSNode('Alice2', tl2)
 bob2 = DPSNode('Bob2', tl2)
 
-acqc2 = QuantumChannel('qc_Alice2_Bob2', tl2, attenuation=0.0002, distance=12345)
+acqc2 = QuantumChannel('qc_Alice2_Bob2', tl2, attenuation=0.0002, distance=1000)
 acqc2.set_ends(alice2, bob2.name)
 
 accc1 = ClassicalChannel('cc_Alice2_Bob2', tl2, 1000)
@@ -282,18 +299,50 @@ accc1.set_ends(alice2, bob2.name)
 accc2 = ClassicalChannel('cc_Bob2_Alice2', tl2, 1000)
 accc2.set_ends(bob2, alice2.name)
 
-alice2_dps = DPS(alice2,'dps1',alice2.name+'light_source')
-bob2_dps = DPS(bob2,'dps',bob2.name+'light_source')
+alice2_dps = DPS(alice2,f'{alice2.name}.DPS',alice2.name+'.light_source')
+bob2_dps = DPS(bob2,'dps',bob2.name+'.light_source')
 pair_dps_protocols(alice2_dps,bob2_dps)
 alice2.protocols[0] = alice2_dps
 bob2.protocols[0] = bob2_dps
+alice2.protocol_stack[0] = alice2_dps
+bob2.protocol_stack[0] = bob2_dps
+alice2.protocol_stack[1].lower_protocols[0] = alice2.protocol_stack[0]
+bob2.protocol_stack[1].lower_protocols[0] = bob2.protocol_stack[0]
+
+print(alice2.protocol_stack)
+
+pair_cascade_protocols(alice2.protocol_stack[1],bob2.protocol_stack[1])
+
+km1 = KeyManager(tl2, 1000, 1)
+km1.lower_protocols.append(alice2.protocol_stack[1])
+alice2.protocol_stack[1].upper_protocols.append(km1)
+alice2.protocol_stack[0].upper_protocols.append(bob2.protocol_stack[1])
+km2 = KeyManager(tl2, 1000, 1)
+km2.lower_protocols.append(bob2.protocol_stack[1])
+bob2.protocol_stack[1].upper_protocols.append(alice2.protocol_stack[1])
+bob2.protocol_stack[1].upper_protocols.append(km2)
+# print('upper protocols',alice2.protocol_stack[0].upper_protocols)
 
 tl2.init()
-alice2_dps.push(128)
+# alice2_dps.push(8000)
+# alice2.protocols[1].push(100)
+km1.send_request()
 tl2.run()
+# alice2.protocols[1].state = 1
 
 
+# print("Alice2's keys:", km1.keys)
+# error_rates = []
+# for i, key in enumerate(km1.keys):
+#     counter = 0
+#     diff = key ^ km2.keys[i]
+#     for j in range(km1.keysize):
+#         counter += (diff >> j) & 1
+#     error_rates.append(counter)
 
+# print("key error rates:")
+# for i, e in enumerate(error_rates):
+#     print("\tkey {}:\t{}%".format(i + 1, e * 100))
 # timeline.init()
 # timeline.run()
 
@@ -318,19 +367,25 @@ def print_keys_and_qber(nodes:list[Node]):
         # print(node[0].aliceKey,node[1].bobKey)
         if  len(node[0].aliceKey) > len(node[1].bobKey):
             qber = calculate_qber(node[0].aliceKey[:len(node[1].bobKey)], node[1].bobKey)
-            print(f"quber of {i}", qber)
+            # print(f"quber of {i}", qber)
             quber_list.append(qber)
         else: 
             qber = calculate_qber(node[0].aliceKey, node[1].bobKey[:len(node[0].aliceKey)])
-            print(f"quber of {i}", qber)
+            # print(f"quber of {i}", qber)
             quber_list.append(qber)
         print("alice_Key=",node[0].aliceKey)
         print(f'bob_key={node[1].bobKey}')
-        print(f'eve_key={''.join(str(key[0]) for key in node[2].eveKey)}')
+        print(f'len of keys = {len(node[1].bobKey)}')
+        # print(f'eve_key={''.join(str(key[0]) for key in node[2].eveKey)}')
     print("average qber:", sum(quber_list)/len(quber_list))
 
+
+# for i, e in enumerate(alice2.protocol_stack[0].error_rates):
+#         print("\tkey {}:\t{}%".format(i + 1, e * 100))
     
-print_keys_and_qber(nodes)
+# print_keys_and_qber(nodes)
+
+# print_keys_and_qber([(alice2,bob2)])
 
 
 # for node in node_list[0]:
