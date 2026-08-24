@@ -2,7 +2,7 @@
 import json
 
 
-from DPS_QKD.DPSprotocol import DPS, DPSMsgType
+from DPSqkd.DPSprotocol import DPS, DPSMsgType
 from sequence.message import Message
 from sequence.topology.node import QKDNode
 from sequence.qkd.cascade import Cascade
@@ -57,7 +57,7 @@ class CLightSource(LightSource):
             num_photons = self.get_generator().poisson(self.mean_photon_num)
             # print("state before error:", state)
 
-            
+            # print("EMIT STATE", i, "AT TIME", time)
             if self.get_generator().random() < self.phase_error:
                 state = multiply([1, -1, 1], state)
 
@@ -74,7 +74,7 @@ class CLightSource(LightSource):
                 self.timeline.schedule(event)
                 self.photon_counter += 1
 
-        time += period
+            time += period
 
 class CDetector(Detector):
     def __init__(self, name, timeline, efficiency = 1, dark_count = 0, count_rate = 25000000, time_resolution = 150):
@@ -189,7 +189,7 @@ class DPSNode(QKDNode):
         if stack_size > 0:
             # print('this is run')
             self.protocols = []
-            self.protocol_stack[0] = DPS(self, name + ".DPS", ls_name)
+            self.protocol_stack[0] = DPS(self, name + ".DPS", ls_name, name+'.interferometer')
             self.protocols.append(self.protocol_stack[0])
         if stack_size > 1:
             # Create cascade protocol
