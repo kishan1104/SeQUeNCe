@@ -1,15 +1,15 @@
 
 from sequence.kernel.timeline import Timeline
-from DPS_QKD.DPSprotocol import DPSMessage,DPSMsgType
+from DPSqkd.DPSprotocol import DPSMessage,DPSMsgType
 from sequence.topology.node import Node,QuantumRouter
 import numpy as np
 from sequence.kernel.process import Process
 from sequence.kernel.event import Event
-from DPS_QKD.DPSprotocol import DPS,pair_dps_protocols,DPSMessage
+from DPSqkd.DPSprotocol import DPS,pair_dps_protocols,DPSMessage
 from sequence.qkd.cascade import pair_cascade_protocols
 from sequence.constants import SPEED_OF_LIGHT
-from DPS_QKD.Utility import calculate_qber, estimate_qber, CreateNetwork
-from DPS_QKD.CustomComponents import DPSNode, ExtRouterNetTopo, EveDPSNode
+from DPSqkd.Utility import calculate_qber, estimate_qber, CreateNetwork
+from DPSqkd.CustomComponents import DPSNode, ExtRouterNetTopo, EveDPSNode
 from sequence.components.optical_channel import QuantumChannel, ClassicalChannel
 
 # tl = Timeline()

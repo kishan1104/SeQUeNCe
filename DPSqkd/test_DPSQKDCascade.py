@@ -5,8 +5,8 @@ from sequence.kernel.timeline import Timeline
 from sequence.topology.node import QKDNode
 from sequence.components.optical_channel import QuantumChannel, ClassicalChannel
 from sequence.constants import MILLISECOND
-from DPS_QKD.DPSprotocol import DPS,pair_dps_protocols
-from DPS_QKD.CustomComponents import DPSNode
+from DPSqkd.DPSprotocol import DPS,pair_dps_protocols
+from DPSqkd.CustomComponents import DPSNode
 
 # class KeyManager():
 #     def __init__(self, timeline, keysize, num_keys):
@@ -177,4 +177,4 @@ def test(sim_time, keysize):
 # interactive_plot = interact(test, sim_time=(10, 100, 10), keysize=[128, 256, 512])
 # interactive_plot
 
-test(1000,100)
+test(1,100)
