@@ -34,7 +34,7 @@ def createState(phases=None):
 
 class CLightSource(LightSource):
     def __init__(self, name, timeline, frequency=8e7, wavelength=1550, bandwidth=0, mean_photon_num=0.1,
-                 encoding_type=polarization, phase_error=0.2):
+                 encoding_type=polarization, phase_error=0.4):
         super().__init__(name, timeline, frequency, wavelength, bandwidth, mean_photon_num, encoding_type, phase_error)
     
 
@@ -53,12 +53,14 @@ class CLightSource(LightSource):
         time = self.timeline.now()
         period = int(round(1e12 / self.frequency))
         # print("period:", period)
+        # print(state_list)
         for i, state in enumerate(state_list):
             num_photons = self.get_generator().poisson(self.mean_photon_num)
             # print("state before error:", state)
 
-            # print("EMIT STATE", i, "AT TIME", time)
+            # print("EMIT STATE", state, "AT TIME", time)
             if self.get_generator().random() < self.phase_error:
+                # print('phase error applied')
                 state = multiply([1, -1, 1], state)
 
 
@@ -73,7 +75,7 @@ class CLightSource(LightSource):
                 event = Event(time, process)
                 self.timeline.schedule(event)
                 self.photon_counter += 1
-
+                # print(f'photon emmitted at time {time}, state = {state}')
             time += period
 
 class CDetector(Detector):
@@ -89,6 +91,7 @@ class CDetector(Detector):
             process = Process( self._receivers[0], "photonDet",   [self.name, self.timeline.now()])
             event = Event(self.timeline.now(), process)
             self.timeline.schedule(event)
+            # print(f"at detector {self.name} , state = {photon.quantum_state.state}, time = {self.timeline.now()}")
             # self._receivers[0].get(self.name, self.timeline.now())
             # print("recieved detector of arrival:",self.name, self.timeline.now())
 
@@ -240,7 +243,7 @@ class DPSNode(QKDNode):
     def receive_message(self, src: str, msg: "Message") -> None:
         # signal to protocol that we've received a message
         for protocol in self.protocols:
-            print('message i')
+            # print(f'message = {msg}, msg.protocol = {msg.protocol_type}')
             if getattr(protocol, "protocol_type", None) or type(protocol) == msg.protocol_type:
                 protocol.received_message(src, msg)
                 return

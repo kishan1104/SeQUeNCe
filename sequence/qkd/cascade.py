@@ -198,7 +198,7 @@ class Cascade(StackProtocol):
 
         Defers to `generate_key` method.
         """
-
+        print(run_time)
         self.generate_key(keylen, frame_num, run_time)
 
     def pop(self, info: int) -> None:
@@ -275,7 +275,7 @@ class Cascade(StackProtocol):
                 p = 0.0001
             self.k1 = get_k1(p, 0, 10000)
             self.state = 1
-
+            print(self.run_time)
             message = CascadeMessage(CascadeMsgType.PARAMS, self.another.name,
                                      k=self.k1, keylen=self.keylen, frame_num=self.frame_num,
                                      run_time=self.run_time)

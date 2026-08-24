@@ -97,8 +97,8 @@ class KeyManager():
             print(p)
             p.push(self.keysize, self.num_keys) # interface for cascade to generate keys
             
-    def pop(self, info): # interface for cascade to return generated keys
-        self.keys.append(info)
+    def pop(self, key): # interface for cascade to return generated keys
+        self.keys.append(key)
         self.times.append(self.timeline.now() * 1e-9)
         
 def test(sim_time, keysize):
@@ -112,13 +112,13 @@ def test(sim_time, keysize):
     # Here, we create nodes for the network (QKD nodes for key distribution)
     n1 = DPSNode("n1", tl)
     n2 = DPSNode("n2", tl)
-    n1.set_seed(0)
-    n2.set_seed(1)
+    # n1.set_seed(0)
+    # n2.set_seed(1)
     
     n1.protocol_stack[1].lower_protocols[0] = n1.protocol_stack[0]
     n2.protocol_stack[1].lower_protocols[0] = n2.protocol_stack[0]
     pair_dps_protocols(n1.protocol_stack[0], n2.protocol_stack[0])
-    # pair_cascade_protocols(n1.protocol_stack[1], n2.protocol_stack[1])
+    pair_cascade_protocols(n1.protocol_stack[1], n2.protocol_stack[1])
     
     # connect the nodes and set parameters for the fibers
     cc0 = ClassicalChannel("cc_n1_n2", tl, distance=1e3)
@@ -131,14 +131,14 @@ def test(sim_time, keysize):
     qc1.set_ends(n2, n1.name)
     
     # instantiate our written keysize protocol
-    km1 = KeyManager(tl, keysize, 10)
-    km1.lower_protocols.append(n1.protocol_stack[0])
-    n1.protocol_stack[0].upper_protocols.append(km1)
+    km1 = KeyManager(tl, keysize, 1)
+    km1.lower_protocols.append(n1.protocol_stack[1])
+    n1.protocol_stack[1].upper_protocols.append(km1)
     # n1.protocol_stack[0].upper_protocols.append(n1.protocol_stack[1])
-    km2 = KeyManager(tl, keysize, 10)
-    km2.lower_protocols.append(n2.protocol_stack[0])
+    km2 = KeyManager(tl, keysize, 1)
+    km2.lower_protocols.append(n2.protocol_stack[1])
     # n2.protocol_stack[0].upper_protocols.append(n2.protocol_stack[1])
-    n2.protocol_stack[0].upper_protocols.append(km2)
+    n2.protocol_stack[1].upper_protocols.append(km2)
     
     # start simulation and record timing
     tl.init()
@@ -162,6 +162,9 @@ def test(sim_time, keysize):
     
     error_rates = []
     print(len(n1.aliceKey), len(n2.bobKey))
+
+    print(km1.keys)
+    print(km2.keys)
     for i, key in enumerate(km1.keys):
         counter = 0
         diff = key ^ km2.keys[i]
@@ -177,4 +180,4 @@ def test(sim_time, keysize):
 # interactive_plot = interact(test, sim_time=(10, 100, 10), keysize=[128, 256, 512])
 # interactive_plot
 
-test(1,100)
+test(100000000,128)

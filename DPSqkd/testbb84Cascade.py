@@ -5,8 +5,8 @@ from sequence.kernel.timeline import Timeline
 from sequence.topology.node import QKDNode
 from sequence.components.optical_channel import QuantumChannel, ClassicalChannel
 from sequence.constants import MILLISECOND
-from DPS_QKD.DPSprotocol import DPS,pair_dps_protocols
-from DPS_QKD.CustomComponents import DPSNode
+from DPSqkd.DPSprotocol import DPS,pair_dps_protocols
+from DPSqkd.CustomComponents import DPSNode
 from sequence.qkd.BB84 import pair_bb84_protocols
 from sequence.qkd.cascade import pair_cascade_protocols
 

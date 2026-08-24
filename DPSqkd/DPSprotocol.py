@@ -30,33 +30,7 @@ def pair_dps_protocols(alice, bob,eve=None):
         eve.another = bob
     # print(f"Paired {alice.owner.name}'s {alice.name} with {bob.owner.name}'s {bob.name}")
 
-def createState(phases=None):
-    if phases is not None:
-        state = [complex(sqrt(1/3))]
-        for ph in phases[1:]:
-            state.append(ph * complex(sqrt(1/3)))
-        return tuple(state), phases
-    
-    state = [complex(sqrt(1/3))]
-    sentstate = []
-    phases = [1]
-    for ph in range(2):
-        phvalue = np.random.choice([1,-1])   
-        state.append(phvalue * complex(sqrt(1/3)))
-        sentstate.append((phvalue))
-        phases.append(phvalue)
-    # self.phase_list.append(phases)
-    if np.random.random() <= 0:
-            chosen = np.random.choice([1,2])
-            r = np.random.random()
-            if r < 0.5:
-                delta = np.random.uniform(0, pi/4)
-            elif r < 0.75:
-                delta = np.random.uniform(0, pi/2)
-            else:
-                delta = np.random.uniform(0,pi)
-            state[chosen] = state[chosen] * (cos(delta) + 1j*sin(delta))
-    return tuple(state), phases
+
 # =========================================================
 # Message Types
 # =========================================================
@@ -131,6 +105,33 @@ class DPS(StackProtocol):
 # =========================================================
 # push() start key generation
 # =========================================================
+    def createState(self,phases=None):
+        if phases is not None:
+            state = [complex(sqrt(1/3))]
+            for ph in phases[1:]:
+                state.append(ph * complex(sqrt(1/3)))
+            return tuple(state), phases
+        
+        state = [complex(sqrt(1/3))]
+        sentstate = []
+        phases = [1]
+        for ph in range(2):
+            phvalue = self.owner.generator.choice([1,-1])   
+            state.append(phvalue * complex(sqrt(1/3)))
+            sentstate.append((phvalue))
+            phases.append(phvalue)
+        # self.phase_list.append(phases)
+        if np.random.random() <= 0:
+                chosen = np.random.choice([1,2])
+                r = np.random.random()
+                if r < 0.5:
+                    delta = np.random.uniform(0, pi/4)
+                elif r < 0.75:
+                    delta = np.random.uniform(0, pi/2)
+                else:
+                    delta = np.random.uniform(0,pi)
+                state[chosen] = state[chosen] * (cos(delta) + 1j*sin(delta))
+        return tuple(state), phases
     def push(self, length,key_num = 1,run_time = math.inf):
 
         if self.role != 0:
@@ -189,7 +190,7 @@ class DPS(StackProtocol):
 
             self.light_time = self.key_lengths[0] / (self.ls_freq * ls.mean_photon_num)
 
-            self.start_time = int(self.owner.timeline.now())
+            self.start_time = int(self.owner.timeline.now()) + round(self.owner.cchannels[self.another.owner.name].delay)
             self.batch_start_time = int(self.owner.timeline.now())
             msg = DPSMessage(
                 DPSMsgType.BEGIN_PHOTON_PULSE,
@@ -217,7 +218,7 @@ class DPS(StackProtocol):
 # Alice send 3-pulse DPS states
 # =========================================================
     def begin_photon_pulse(self):
-        print(f"{self.name} begin photon pulse at time {self.owner.timeline.now()} ps")
+        # print(f"{self.name} begin photon pulse at time {self.owner.timeline.now()} ps")
 
         if self.working and self.owner.timeline.now() < self.end_run_times[0]:
             self.owner.destination = self.another.owner.name
@@ -230,9 +231,9 @@ class DPS(StackProtocol):
             period = int(round(1e12/self.ls_freq))
             lightsource = self.owner.components[self.ls_name]
             encoding_type = lightsource.encoding_type
-            for i in range(1,num_pulses+1):
+            for i in range(num_pulses):
                 send_times.append(now_time+(i*period))
-                state, phases = createState()
+                state, phases = self.createState()
                 phase_list.append(phases)
                 state_list.append(state)
             lightsource.emit(state_list)
@@ -268,11 +269,16 @@ class DPS(StackProtocol):
 # Bob detector input (only time)
 # =========================================================
     def pop(self, detector, time):
-        # print("Bob pop method called with detector:", detector, "time:", time)
+        # print("Bob pop method called with detector:", detector, "time:", time, ' length:', len(self.times))
         if self.role != 1:
             return
 
+        if self.times and time - self.times[-1] <= 4200:
+            # print(f'multiple photons')
+            return
+        
         self.times.append(time)
+        
         # print(self.times, "Bob recorded times")
     #     print(
     #     "BOB DETECTION:",
@@ -307,31 +313,34 @@ class DPS(StackProtocol):
             count = 0
             self.start_time = self.owner.timeline.now()
             for t, det in self.bob_results:
+                # print(t, det)
                 if self.eve:
                     delay = self.eve.owner.qchannels[self.owner.name].distance / SPEED_OF_LIGHT
                 else:
                     delay = self.another.owner.qchannels[self.owner.name].distance / SPEED_OF_LIGHT
-                t = t - delay
+                t = t
                 bin_seperation = 1400
                 slot = int((t%self.ls_freq)//bin_seperation)
-                print(f'slot at end detection : {slot}, dt = {t}')
+                # print(f'slot at end detection : {slot}, dt = {t}')
                 if slot == 1 or slot == 2:
                     count += 1
                     if det == f'{self.owner.name}.detector0':
+                        # print(f'appended 0')
                         self.key_bits.append(0)
                     elif det == f'{self.owner.name}.detector1':
                         self.key_bits.append(1)
-            print(f"key bits length {len(self.key_bits)}")
+                        # print(f'appended 1')
+            # print(f"key bits length {len(self.key_bits)}")
             if self.owner.bobKey == '':
-                self.owner.bobKey = "".join(map(str,self.bobkey))
-            print(self.owner.timeline.now(), "end runtime :", self.end_run_times[0])
+                self.owner.bobKey = "".join(map(str,self.key_bits))
+            # print(self.owner.timeline.now(), "end runtime :", self.end_run_times[0])
             if self.owner.timeline.now() + self.light_time * 1e12 -1 < self.end_run_times[0]:
-                print(f'end detection scheduled again at ', self.start_time + int(round(self.light_time*1e12)-1))
+                # print(f'end detection scheduled again at ', self.start_time + int(round(self.light_time*1e12)-1))
                 process = Process(self, 'end_detection', [])
                 event = Event(self.start_time + int(round(self.light_time*1e12)-1), process)
                 self.owner.timeline.schedule(event)
 
-
+            # print(len(self.times), ': self.times')
         # self.bob_results = []
             msg = DPSMessage(
                 DPSMsgType.DETECTION_TIME,
@@ -340,6 +349,10 @@ class DPS(StackProtocol):
             )
             # print(f"slots: {self.slots}")
             self.owner.send_message(self.another.owner.name, msg)
+            self.times = []
+            self.bob_results = []
+            self.phase_list = []
+            
 
 
 # =========================================================
@@ -367,7 +380,7 @@ class DPS(StackProtocol):
                 else:
                     delay = self.owner.qchannels[src].delay 
                 self.start_time = msg.start_time + delay
-                end = self.start_time + int(self.light_time * 1e12) -1  # wait for 5000 ps after last pulse
+                end = self.start_time + int(self.light_time * 1e12) -1 # wait for 5000 ps after last pulse
 
                 process = Process(self, "end_detection", [])
                 event = Event(end, process)
@@ -390,19 +403,23 @@ class DPS(StackProtocol):
                 delay = self.distance / SPEED_OF_LIGHT
                 # print("Distance:", self.distance, "m, Delay:", delay, "ps")
                 msg_times_nodelay = [int(t - delay) for t in msg.times]
-                print(len(msg_times_nodelay))
-                print(f'len send times:{len(self.send_times)}')
-                print(f'phase list : {len(self.phase_list)}')
+                # print(f'delay times {len(msg_times_nodelay)}')
+                
                 send_times = self.send_times.pop(0)
                 phase_list = self.phase_list.pop(0)
+                # print(f'len send times:{len(send_times)}')
+                # print(f'phase list : {len(phase_list)}')
                 idx = 0
+                count = 0
                 for t in msg_times_nodelay:
-
+                    
                     while idx < len(send_times):
 
                         difference = t - send_times[idx]
 
                         if 0 <= difference <= 4200:
+                            # print(f'{t} send time and diff:{difference}')
+                            count+=1
                             break
 
                         idx += 1
@@ -413,8 +430,9 @@ class DPS(StackProtocol):
 
                     # We matched this send time.
                     # Move to the next one so it cannot be reused.
-                    matched_time = send_times[idx]
-                    idx += 1
+                    # matched_time = send_times[idx]
+                    # print(f'this is total count {count}, send_times at index {idx} is {send_times[idx]}')
+                    # idx += 1
 
                     # print(
                     #     "MATCH:",
@@ -423,8 +441,9 @@ class DPS(StackProtocol):
                     #     "difference =", t - matched_time
                     # )
                     dt = t - send_times[idx]
+                    # print(f'time = {t} and send_times index {idx} is {send_times[idx]} this is difference {dt}')
                     slot = int(dt / bin_sep)
-                    # print("slot:", slot, "dt:", dt, "index:",idx)
+                    # print("slot:", slot, "dt:", send_times[idx], "index:",idx, 'phase ', ([int(i) for i in phase_list[idx]]))
                     p0,p1, p2 = phase_list[idx]
                     # print(self.phase_list[idx], "Alice phase for this pulse")
                     if slot == 1:
@@ -445,15 +464,18 @@ class DPS(StackProtocol):
                             bit = 0
                             self.key_bits.append(bit)
                         # bit = 0 if p2 == 1 else 1
-                print(len(self.key_bits),"self key")   
-                print("key length ",self.key_lengths[0])
+                # print((self.key_bits),"self key")   
+                # print("key length ",self.key_lengths[0])
                 if len(self.key_bits) >= self.key_lengths[0]:
                     throughput = self.key_lengths[0]*1e12 / (self.owner.timeline.now()-self.last_key_time)
                     while len(self.key_bits)>= self.key_lengths[0] and self.keys_left_list[0]>0:
                         print(f'{self.name} generated a valid key')
                         self.set_key()
-                        self._pop(info = self.key)
                         self.another.set_key()
+                        # key = "".join(str(b) for b in self.key_bits)
+                        # key2 = "".join(str(b) for b in self.another.key_bits)
+                        self._pop(info = self.key)
+                        
                         self.another._pop(info = self.another.key)
 
                         if self.latency == 0:
@@ -465,20 +487,22 @@ class DPS(StackProtocol):
                         while key_diff:
                             key_diff &= key_diff - 1
                             num_errors += 1
-                        self.error_rates.append(num_errors / self.key_length)
+                        self.error_rates.append(num_errors / self.key_lengths[0])
                         self.keys_left_list[0] -=1
 
 
                     self.last_key_time = self.owner.timeline.now()
-                    print(f"last key time:", self.last_key_time)
+                    # print(f"last key time:", self.last_key_time)
 
                 if self.keys_left_list[0] <1:
                     self.working = False
                     self.another.working = False
 
-                print(self.owner.timeline.now())
+                # print(self.owner.timeline.now())
 
     def set_key(self):
+        # print(f'{self} called the set_key')
         bits = self.key_bits[0:self.key_lengths[0]]
         del self.key_bits[0:self.key_lengths[0]]
         self.key = int("".join(str(b) for b in bits), 2)
+        # print(f'after set key is done key_bits length = {len(self.key_bits)}')
