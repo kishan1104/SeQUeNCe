@@ -2,6 +2,7 @@
 import json
 
 
+from DPSqkd.PrivacyAmplification import PrivacyAmplification
 from DPSqkd.DPSprotocol import DPS, DPSMsgType
 from sequence.message import Message
 from sequence.topology.node import QKDNode
@@ -34,7 +35,7 @@ def createState(phases=None):
 
 class CLightSource(LightSource):
     def __init__(self, name, timeline, frequency=8e7, wavelength=1550, bandwidth=0, mean_photon_num=0.1,
-                 encoding_type=polarization, phase_error=0.4):
+                 encoding_type=polarization, phase_error=0.01):
         super().__init__(name, timeline, frequency, wavelength, bandwidth, mean_photon_num, encoding_type, phase_error)
     
 
@@ -200,7 +201,11 @@ class DPSNode(QKDNode):
             self.protocols.append(self.protocol_stack[1])
             self.protocol_stack[0].upper_protocols.append(self.protocol_stack[1])
             self.protocol_stack[1].lower_protocols.append(self.protocol_stack[0])
-
+        if stack_size > 2:
+            self.protocol_stack[2] = PrivacyAmplification(self,name+".privacy_amplification")
+            self.protocols.append(self.protocol_stack[2])
+            self.protocol_stack[1].upper_protocols.append(self.protocol_stack[2])
+            self.protocol_stack[2].lower_protocols.append(self.protocol_stack[1]) 
     def init(self):
         pass
         

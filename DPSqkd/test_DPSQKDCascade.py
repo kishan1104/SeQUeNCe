@@ -132,13 +132,11 @@ def test(sim_time, keysize):
     
     # instantiate our written keysize protocol
     km1 = KeyManager(tl, keysize, 1)
-    km1.lower_protocols.append(n1.protocol_stack[1])
-    n1.protocol_stack[1].upper_protocols.append(km1)
-    # n1.protocol_stack[0].upper_protocols.append(n1.protocol_stack[1])
+    km1.lower_protocols.append(n1.protocol_stack[2])
+    n1.protocol_stack[2].upper_protocols.append(km1)
     km2 = KeyManager(tl, keysize, 1)
-    km2.lower_protocols.append(n2.protocol_stack[1])
-    # n2.protocol_stack[0].upper_protocols.append(n2.protocol_stack[1])
-    n2.protocol_stack[1].upper_protocols.append(km2)
+    km2.lower_protocols.append(n2.protocol_stack[2])
+    n2.protocol_stack[2].upper_protocols.append(km2)
     
     # start simulation and record timing
     tl.init()
@@ -161,7 +159,7 @@ def test(sim_time, keysize):
     # plt.show()
     
     error_rates = []
-    print(len(n1.aliceKey), len(n2.bobKey))
+    print(f"Length of aliceKey: {len(n1.aliceKey)}, Length of bobKey: {len(n2.bobKey)}")
 
     print(km1.keys)
     print(km2.keys)

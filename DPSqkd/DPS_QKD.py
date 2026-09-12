@@ -223,12 +223,12 @@ def qber_with_eve(n,attack=''):
 #         nwtnodes[i].run()
 #         tm.run()
 
-nwtnodes, nodes, timelines = test(1)
+# nwtnodes, nodes, timelines = test(1)
 
-for i,tm in enumerate(timelines):
-        tm.init()
-        nwtnodes[i].run()
-        tm.run()
+# for i,tm in enumerate(timelines):
+#         tm.init()
+#         nwtnodes[i].run()
+#         tm.run()
 
 # nwtnodes, nodes, timelines = qber_with_eve(100,'IR')
 # for i,tm in enumerate(timelines):
