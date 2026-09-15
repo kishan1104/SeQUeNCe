@@ -7,6 +7,7 @@ from sequence.components.optical_channel import QuantumChannel, ClassicalChannel
 from sequence.constants import MILLISECOND
 from DPSqkd.DPSprotocol import DPS,pair_dps_protocols
 from DPSqkd.CustomComponents import DPSNode
+from DPSqkd.PrivacyAmplification import PrivacyAmplification, pair_privacy_amp_protocols
 
 # class KeyManager():
 #     def __init__(self, timeline, keysize, num_keys):
@@ -119,6 +120,7 @@ def test(sim_time, keysize):
     n2.protocol_stack[1].lower_protocols[0] = n2.protocol_stack[0]
     pair_dps_protocols(n1.protocol_stack[0], n2.protocol_stack[0])
     pair_cascade_protocols(n1.protocol_stack[1], n2.protocol_stack[1])
+    pair_privacy_amp_protocols(n1.protocol_stack[2], n2.protocol_stack[2])
     
     # connect the nodes and set parameters for the fibers
     cc0 = ClassicalChannel("cc_n1_n2", tl, distance=1e3)
@@ -159,7 +161,7 @@ def test(sim_time, keysize):
     # plt.show()
     
     error_rates = []
-    print(f"Length of aliceKey: {len(n1.aliceKey)}, Length of bobKey: {len(n2.bobKey)}")
+    # print(f"Length of aliceKey: {len(n1.aliceKey)}, Length of bobKey: {len(n2.bobKey)}")
 
     print(km1.keys)
     print(km2.keys)
@@ -178,4 +180,4 @@ def test(sim_time, keysize):
 # interactive_plot = interact(test, sim_time=(10, 100, 10), keysize=[128, 256, 512])
 # interactive_plot
 
-test(100000000,128)
+test(2000,128)

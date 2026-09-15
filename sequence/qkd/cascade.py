@@ -198,7 +198,7 @@ class Cascade(StackProtocol):
 
         Defers to `generate_key` method.
         """
-        print(run_time)
+        # print(run_time)
         self.generate_key(keylen, frame_num, run_time)
 
     def pop(self, info: int) -> None:
@@ -275,7 +275,7 @@ class Cascade(StackProtocol):
                 p = 0.0001
             self.k1 = get_k1(p, 0, 10000)
             self.state = 1
-            print(self.run_time)
+            # print(self.run_time)
             message = CascadeMessage(CascadeMsgType.PARAMS, self.another.name,
                                      k=self.k1, keylen=self.keylen, frame_num=self.frame_num,
                                      run_time=self.run_time)
@@ -394,7 +394,7 @@ class Cascade(StackProtocol):
                 self.valid_keys.append((self.bits[key_id] >> (i*self.keylen)) & ((1 << self.keylen)-1))
                 if self.frame_num > 0:
                     log.logger.info(self.name + f' state={self.state} got valid key')
-                    print(self.name + f' state={self.state} got valid key')
+                    # print(self.name + f' state={self.state} got valid key')
                     self._pop(key=self.valid_keys[-1])
                     self.frame_num -= 1
 
@@ -532,7 +532,7 @@ class Cascade(StackProtocol):
             self.valid_keys.append((self.bits[key_id] >> (i*self.keylen)) & ((1 << self.keylen)-1))
             if self.frame_num > 0:
                 log.logger.info(self.name + f' state={self.state} got_valid_key')
-                print(self.name + f' state={self.state} got valid key')
+                # print(self.name + f' state={self.state} got valid key')
                 self._pop(key=self.valid_keys[-1])
                 self.frame_num -= 1
 
@@ -629,176 +629,4 @@ class Cascade(StackProtocol):
             self.error_bit_rate = 0
         self.time_cost = self.end_time - self.start_time
 
-        print(self.name + f' state={self.state} performance_measure, metrics={[self.throughput, self.privacy_throughput, self.latency, self.error_bit_rate, self.time_cost]}')
-
-    # def dps_tau(self, Q):
-    #     """DPS privacy-amplification compression factor.
-
-    #     Security model:
-    #     DPS-QKD against individual attacks.
-    #     """
-
-    #     # Upper bound on Eve's collision probability
-    #     p_c = 1 - Q**2 - ((1 - 6 * Q)**2) / 2
-
-    #     # Numerical safety
-    #     if p_c <= 0:
-    #         return 0.0
-
-    #     if p_c >= 1:
-    #         return 0.0
-
-    #     # Privacy amplification compression factor
-    #     tau = -math.log2(p_c)
-
-    #     return tau
-
-    # def performance_measure2(self) -> None:
-    #     """Method to record performance metrics."""
-    #     # ===========================================================
-    #     # 1. LATENCY
-    #     # ============================================================
-
-    #     if self.role == 0:
-    #         self.latency = 0
-    #         counter = 0
-
-    #         for i in range(len(self.t1)):
-    #             if self.t2[i] != -1:
-    #                 self.latency += self.t2[i] - self.t1[i]
-    #                 counter += 1
-
-    #         if counter > 0:
-    #             self.latency /= counter
-    #         else:
-    #             self.latency = None
-
-    #         self.another.latency = self.latency
-
-    #     # ============================================================
-    #     # 2. NUMBER OF VALID KEY BLOCKS
-    #     # ============================================================
-
-    #     N = min(
-    #         len(self.valid_keys),
-    #         len(self.another.valid_keys)
-    #     )
-
-    #     # Total number of sifted bits
-    #     sifted_bits = N * self.keylen
-
-    #     # ============================================================
-    #     # 3. QBER
-    #     # ============================================================
-
-    #     error_bits = 0
-
-    #     for j in range(N):
-
-    #         # XOR Alice's and Bob's key blocks
-    #         val = self.valid_keys[j] ^ self.another.valid_keys[j]
-
-    #         # Count 1s in XOR
-    #         while val:
-    #             error_bits += val & 1
-    #             val >>= 1
-
-    #     if sifted_bits > 0:
-    #         self.error_bit_rate = error_bits / sifted_bits
-    #         print(self.error_bit_rate)
-    #     else:
-    #         self.error_bit_rate = 0.0
-
-    #     Q = self.error_bit_rate
-
-       
-    #     # ============================================================
-    #     # 4. ELAPSED TIME
-    #     # ============================================================
-
-    #     elapsed = self.owner.timeline.now() - self.start_time
-
-    #     if elapsed > 0:
-
-    #         # ========================================================
-    #         # 5. SIFTED KEY RATE
-    #         # ========================================================
-
-    #         self.throughput = (
-    #             1e12 * sifted_bits / elapsed
-    #         )
-
-    #         # ========================================================
-    #         # 6. BINARY ENTROPY H(Q)
-    #         # ========================================================
-
-    #         if Q == 0.0 or Q == 1.0:
-    #             H_Q = 0.0
-    #         else:
-    #             H_Q = (
-    #                 -Q * math.log2(Q)
-    #                 -(1 - Q) * math.log2(1 - Q)
-    #             )
-
-    #         # ========================================================
-    #         # 7. ASYMPTOTIC ERROR-CORRECTION TERM
-    #         # ========================================================
-
-    #         f_ec = 1.16
-
-    #         error_correction_fraction = f_ec * H_Q
-
-    #         # ========================================================
-    #         # 8. DPS PRIVACY AMPLIFICATION TERM
-    #         # ========================================================
-
-    #         tau_Q = self.dps_tau(Q)
-
-    #         # ========================================================
-    #         # 9. SECURE KEY FRACTION
-    #         # ========================================================
-
-    #         secure_fraction = (
-    #             tau_Q
-    #             - error_correction_fraction
-    #         )
-
-    #         # No secure key if the fraction is negative
-    #         if secure_fraction < 0:
-    #             secure_fraction = 0.0
-
-    #         # ========================================================
-    #         # 10. ASYMPTOTIC SECURE KEY RATE
-    #         # ========================================================
-
-    #         self.privacy_throughput = (
-    #             self.throughput * secure_fraction
-    #         )
-
-    #     else:
-    #         self.throughput = 0.0
-    #         self.privacy_throughput = 0.0
-
-    #     # ============================================================
-    #     # 11. TIME COST
-    #     # ============================================================
-
-    #     if self.end_time != float("inf"):
-    #         self.time_cost = self.end_time - self.start_time
-    #     else:
-    #         self.time_cost = None
-
-    #     # ============================================================
-    #     # 12. PRINT METRICS
-    #     # ============================================================
-
-    #     print(
-    #         self.name
-    #         + f' state={self.state} performance_measure 2, '
-    #         + f'metrics=['
-    #         + f'{self.throughput}, '
-    #         + f'{self.privacy_throughput}, '
-    #         + f'{self.latency}, '
-    #         + f'{self.error_bit_rate}, '
-    #         + f'{self.time_cost}]'
-    #     )
+        print(self.name + f' state={self.state} performance_measure, metrics \n throughput = {self.throughput}  \n secure_throughput = {self.privacy_throughput}, error_bit_rate = {self.error_bit_rate}, time_cost = {self.time_cost}')

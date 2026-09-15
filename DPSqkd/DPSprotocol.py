@@ -149,17 +149,7 @@ class DPS(StackProtocol):
             self.working = True
             self.another.working = True
             self.start_protocol()
-        # self.send_times = []
-        # self.phase_list = []
-        # self.key_bits = []
-        # self.bob_results= []
-        # self.times = []
 
-
-        # self.working = True
-        # self.another.working = True
-        # print("called push generating keys",self)
-        # self.start_protocol()
 
 
 # =========================================================
@@ -425,7 +415,7 @@ class DPS(StackProtocol):
                         idx += 1
 
                     if idx >= len(send_times):
-                        print("No more send times to match with")
+                        # print("No more send times to match with")
                         break
 
                     # We matched this send time.
@@ -469,7 +459,7 @@ class DPS(StackProtocol):
                 if len(self.key_bits) >= self.key_lengths[0]:
                     throughput = self.key_lengths[0]*1e12 / (self.owner.timeline.now()-self.last_key_time)
                     while len(self.key_bits)>= self.key_lengths[0] and self.keys_left_list[0]>0:
-                        print(f'{self.name} generated a valid key')
+                        # print(f'{self.name} generated a valid key')
                         self.set_key()
                         self.another.set_key()
                         # key = "".join(str(b) for b in self.key_bits)
