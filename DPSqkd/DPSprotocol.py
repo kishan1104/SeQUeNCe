@@ -321,8 +321,8 @@ class DPS(StackProtocol):
                         self.key_bits.append(1)
                         # print(f'appended 1')
             # print(f"key bits length {len(self.key_bits)}")
-            if self.owner.bobKey == '':
-                self.owner.bobKey = "".join(map(str,self.key_bits))
+            # if self.owner.bobKey == '':
+            #     self.owner.bobKey = "".join(map(str,self.key_bits))
             # print(self.owner.timeline.now(), "end runtime :", self.end_run_times[0])
             if self.owner.timeline.now() + self.light_time * 1e12 -1 < self.end_run_times[0]:
                 # print(f'end detection scheduled again at ', self.start_time + int(round(self.light_time*1e12)-1))
@@ -482,7 +482,7 @@ class DPS(StackProtocol):
 
 
                     self.last_key_time = self.owner.timeline.now()
-                    # print(f"last key time:", self.last_key_time)
+                    print(f"last key time:", self.last_key_time)
 
                 if self.keys_left_list[0] <1:
                     self.working = False

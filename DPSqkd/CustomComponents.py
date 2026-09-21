@@ -168,7 +168,7 @@ class CInterferometer(Interferometer):
 class DPSNode(QKDNode):
     def __init__(self, name, timeline, seed=None, stack_size = 5):
         super().__init__(name, timeline, seed=seed,stack_size=stack_size)
-        source = CLightSource(name = name+'.light_source',
+        self.source = CLightSource(name = name+'.light_source',
                                 timeline=timeline,
                                 frequency=1e6,
                                 mean_photon_num=0.2,
@@ -177,8 +177,8 @@ class DPSNode(QKDNode):
         self.bobKey = ''
         self.eveKey = ''
         self.dpskeys = {}
-        self.add_component(source)
-        source.add_receiver(self)
+        self.add_component(self.source)
+        self.source.add_receiver(self)
         self.detectors = [CDetector(name + ".detector" + str(i), timeline) for i in range(2)]
         self.interferometer = CInterferometer(name + ".interferometer", timeline, time_bin["bin_separation"])
         self.interferometer.add_receiver(self.detectors[0])

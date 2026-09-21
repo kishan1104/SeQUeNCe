@@ -1,6 +1,12 @@
+from cmath import inf
+import math
+
 from ipywidgets import interact
 from matplotlib import pyplot as plt
 import time
+from sequence.constants import SPEED_OF_LIGHT
+from sequence.kernel.process import Process
+from sequence.kernel.event import Event
 from sequence.kernel.timeline import Timeline
 from sequence.topology.node import QKDNode
 from sequence.components.optical_channel import QuantumChannel, ClassicalChannel
@@ -86,6 +92,7 @@ from sequence.qkd.cascade import pair_cascade_protocols
 
 class KeyManager():
     def __init__(self, timeline, keysize, num_keys):
+        # self.owner = owner
         self.timeline = timeline
         self.lower_protocols = []
         self.keysize = keysize
@@ -108,45 +115,141 @@ def test(sim_time, keysize):
     keysize: size of generated secure key (bits)
     """
     # begin by defining the simulation timeline with the correct simulation time
-    tl = Timeline(sim_time * 1e9)
+    tl = Timeline()
     
     # Here, we create nodes for the network (QKD nodes for key distribution)
     n1 = DPSNode("n1", tl)
     n2 = DPSNode("n2", tl)
+    n3 = DPSNode("n3", tl)
+    n4 = DPSNode("n4", tl)
     # n1.set_seed(0)
     # n2.set_seed(1)
+    # n3.set_seed(2)
     
     n1.protocol_stack[1].lower_protocols[0] = n1.protocol_stack[0]
     n2.protocol_stack[1].lower_protocols[0] = n2.protocol_stack[0]
-    pair_dps_protocols(n1.protocol_stack[0], n2.protocol_stack[0])
-    pair_cascade_protocols(n1.protocol_stack[1], n2.protocol_stack[1])
-    pair_privacy_amp_protocols(n1.protocol_stack[2], n2.protocol_stack[2])
+    n3.protocol_stack[1].lower_protocols[0] = n3.protocol_stack[0]
+    n4.protocol_stack[1].lower_protocols[0] = n4.protocol_stack[0]
+    # pair_dps_protocols(n1.protocol_stack[0], n2.protocol_stack[0])
+    # pair_cascade_protocols(n1.protocol_stack[1], n2.protocol_stack[1])
+    # pair_privacy_amp_protocols(n1.protocol_stack[2], n2.protocol_stack[2])
+
+
     
     # connect the nodes and set parameters for the fibers
     cc0 = ClassicalChannel("cc_n1_n2", tl, distance=1e3)
     cc1 = ClassicalChannel("cc_n2_n1", tl, distance=1e3)
+    cc23 = ClassicalChannel("cc_n2_n3", tl, distance=1e3)
+    cc32 = ClassicalChannel("cc_n3_n2", tl, distance=1e3)
+    cc34 = ClassicalChannel("cc_n3_n4", tl, distance=1e3)
+    cc43 = ClassicalChannel("cc_n4_n3", tl, distance=1e3)
     cc0.set_ends(n1, n2.name)
     cc1.set_ends(n2, n1.name)
+    cc23.set_ends(n2, n3.name)
+    cc32.set_ends(n3, n2.name)
+    cc34.set_ends(n3, n4.name)
+    cc43.set_ends(n4, n3.name)
     qc0 = QuantumChannel("qc_n1_n2", tl, attenuation=1e-5, distance=1e3, polarization_fidelity=0.97)
     qc1 = QuantumChannel("qc_n2_n1", tl, attenuation=1e-5, distance=1e3, polarization_fidelity=0.97)
+    qc23 = QuantumChannel("qc_n2_n3", tl, attenuation=1e-5, distance=1e3, polarization_fidelity=0.97)
+    qc32 = QuantumChannel("qc_n3_n2", tl, attenuation=1e-5, distance=1e3, polarization_fidelity=0.97)
+    qc34 = QuantumChannel("qc_n3_n4", tl, attenuation=1e-5, distance=1e3, polarization_fidelity=0.97)
+    qc43 = QuantumChannel("qc_n4_n3", tl, attenuation=1e-5, distance=1e3, polarization_fidelity=0.97)
+
     qc0.set_ends(n1, n2.name)
     qc1.set_ends(n2, n1.name)
-    
+    qc23.set_ends(n2, n3.name)
+    qc32.set_ends(n3, n2.name)
+    qc34.set_ends(n3, n4.name)
+    qc43.set_ends(n4, n3.name)
+
     # instantiate our written keysize protocol
-    km1 = KeyManager(tl, keysize, 1)
-    km1.lower_protocols.append(n1.protocol_stack[2])
-    n1.protocol_stack[2].upper_protocols.append(km1)
-    km2 = KeyManager(tl, keysize, 1)
-    km2.lower_protocols.append(n2.protocol_stack[2])
-    n2.protocol_stack[2].upper_protocols.append(km2)
-    
+    # km1 = KeyManager(tl, keysize, 1)
+    # km1.lower_protocols.append(n1.protocol_stack[2])
+    # # n1.protocol_stack[2].upper_protocols.append(km1)
+    # km2 = KeyManager(tl, keysize, 1)
+    # km2.lower_protocols.append(n2.protocol_stack[2])
+    # # n2.protocol_stack[2].upper_protocols.append(km2)
+    # km3 = KeyManager(tl, keysize, 1)
+    # km3.lower_protocols.append(n3.protocol_stack[2])
+    # n3.protocol_stack[2].upper_protocols.append(km3)
+
+
+
+    class Node3Net:
+        def __init__(self,nodes:list,timeline,keysize=128):
+            self.keymanagers = {}
+            self.nodes = nodes
+            self.key_size = keysize
+            self.timeline = timeline
+        
+        def GetKey(self,node1,node2): 
+
+            pair_dps_protocols(node1.protocol_stack[0], node2.protocol_stack[0])
+            pair_cascade_protocols(node1.protocol_stack[1], node2.protocol_stack[1])
+            pair_privacy_amp_protocols(node1.protocol_stack[2], node2.protocol_stack[2])
+
+            keymanager = KeyManager(self.timeline, self.key_size, 1)
+            keymanager.lower_protocols.append(node1.protocol_stack[2])
+            node1.protocol_stack[2].upper_protocols.append(keymanager)
+
+            km2 = KeyManager(self.timeline, self.key_size, 1)
+            km2.lower_protocols.append(node2.protocol_stack[2])
+            node2.protocol_stack[2].upper_protocols.append(km2)
+
+            self.keymanagers[(node1.name,node2.name)] = keymanager
+
+            self.keymanagers[(node2.name,node1.name)] = km2
+
+            keymanager.send_request() # interface to get keys back
+
+
+        def run(self):
+
+            key_bet = []
+            for i in range(len(self.nodes)):
+                if i == len(self.nodes)-1:
+                    break
+                key_bet.append((self.nodes[i],self.nodes[i+1]))
+            
+
+            start_time = None
+            end_time = None
+            for i,(node1,node2) in enumerate(key_bet):
+                delay = node1.qchannels[node2.name].distance / SPEED_OF_LIGHT
+                if i == 0:
+                    start_time = self.timeline.now()
+                    end_time = start_time + (int((self.key_size +100000 / node1.source.frequency) * 1e12)) + delay  
+                    process = Process(self,"GetKey",[node1,node2])
+                    event = Event(start_time, process)
+                    self.timeline.schedule(event)
+                else:
+                    start_time = end_time   # Schedule next round after the previous one finishes
+                    end_time = start_time + (int((self.key_size +100000 / node1.source.frequency) * 1e12)) + delay
+                    process = Process(self,"GetKey",[node1,node2])
+                    event = Event(start_time, process)
+                    self.timeline.schedule(event)
+            print(end_time, "scheduled all key generation processes")
+
+
+
+
+    nodes = [n1,n2,n3,n4]
+
+    net = Node3Net(nodes, tl, keysize=128)
+
     # start simulation and record timing
     tl.init()
-    km1.send_request()
+    # km1.send_request()
+    # km2.send_request()
+    net.run()
     tick = time.time()
     tl.run()
     print("execution time %.2f sec" % (time.time() - tick))
 
+
+    for km in net.keymanagers.values():
+        print(km.keys)
 
     # print(km2.keys)
     # print(n1.aliceKey)
@@ -161,23 +264,24 @@ def test(sim_time, keysize):
     # plt.show()
     
     error_rates = []
-    # print(f"Length of aliceKey: {len(n1.aliceKey)}, Length of bobKey: {len(n2.bobKey)}")
+    print(f"Length of aliceKey: {len(n1.aliceKey)}, Length of bobKey: {len(n2.bobKey)}")
 
-    print(km1.keys)
-    print(km2.keys)
-    for i, key in enumerate(km1.keys):
-        counter = 0
-        diff = key ^ km2.keys[i]
-        for j in range(km1.keysize):
-            counter += (diff >> j) & 1
-        error_rates.append(counter)
 
-    print("key error rates:")
-    for i, e in enumerate(error_rates):
-        print("\tkey {}:\t{}%".format(i + 1, e))
+    # print(km1.keys)
+    # print(km2.keys)
+    # for i, key in enumerate(km1.keys):
+    #     counter = 0
+    #     diff = key ^ km2.keys[i]
+    #     for j in range(km1.keysize):
+    #         counter += (diff >> j) & 1
+    #     error_rates.append(counter)
+
+    # print("key error rates:")
+    # for i, e in enumerate(error_rates):
+    #     print("\tkey {}:\t{}%".format(i + 1, e))
 
 # Create and run the simulation
 # interactive_plot = interact(test, sim_time=(10, 100, 10), keysize=[128, 256, 512])
 # interactive_plot
 
-test(2000,128)
+test(1000000000000000,128)
