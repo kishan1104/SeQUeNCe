@@ -1,6 +1,6 @@
 from cmath import inf
 import math
-
+from sequence.qkd.cascade import Cascade
 from ipywidgets import interact
 from matplotlib import pyplot as plt
 import time
@@ -108,7 +108,26 @@ class KeyManager():
     def pop(self, key): # interface for cascade to return generated keys
         self.keys.append(key)
         self.times.append(self.timeline.now() * 1e-9)
-        
+
+def create_dps(node,stack_size=3):
+    if stack_size > 0:
+        # print('this is run')
+        node.protocols = []
+        node.protocol_stack[0] = DPS(node, node.name + ".DPS", node.name+'.light_source', node.name+'.interferometer')
+        node.protocols.append(node.protocol_stack[0])
+    if stack_size > 1:
+        # Create cascade protocol
+        node.protocol_stack[1] = Cascade(node, node.name + ".cascade")
+        node.protocols.append(node.protocol_stack[1])
+        node.protocol_stack[0].upper_protocols.append(node.protocol_stack[1])
+        node.protocol_stack[1].lower_protocols.append(node.protocol_stack[0])
+    if stack_size > 2:
+        node.protocol_stack[2] = PrivacyAmplification(node,node.name+".privacy_amplification")
+        node.protocols.append(node.protocol_stack[2])
+        node.protocol_stack[1].upper_protocols.append(node.protocol_stack[2])
+        node.protocol_stack[2].lower_protocols.append(node.protocol_stack[1])
+
+
 def test(sim_time, keysize):
     """
     sim_time: duration of simulation time (ms)
@@ -177,31 +196,38 @@ def test(sim_time, keysize):
 
 
     class Node3Net:
-        def __init__(self,nodes:list,timeline,keysize=128):
+        def __init__(self,nodes:list,timeline,keysize=128, stack_size=3):
             self.keymanagers = {}
             self.nodes = nodes
             self.key_size = keysize
             self.timeline = timeline
+            self.stack_size = stack_size
         
         def GetKey(self,node1,node2): 
-
+            # self.alice_dps = DPS(node1,'dps1',node1.name+'.light_source') 
+            # self.bob_dps = DPS(node2,'dps',node2.name+'.light_source') 
+            create_dps(node1,stack_size=self.stack_size)
+            create_dps(node2,stack_size=self.stack_size)
             pair_dps_protocols(node1.protocol_stack[0], node2.protocol_stack[0])
             pair_cascade_protocols(node1.protocol_stack[1], node2.protocol_stack[1])
             pair_privacy_amp_protocols(node1.protocol_stack[2], node2.protocol_stack[2])
 
+            
+        # if self.keymanagers.get(node1.name) is None:
             keymanager = KeyManager(self.timeline, self.key_size, 1)
             keymanager.lower_protocols.append(node1.protocol_stack[2])
             node1.protocol_stack[2].upper_protocols.append(keymanager)
+            self.keymanagers[(node1.name, node2.name)] = keymanager
 
+        # if self.keymanagers.get(node2.name) is None:
             km2 = KeyManager(self.timeline, self.key_size, 1)
             km2.lower_protocols.append(node2.protocol_stack[2])
             node2.protocol_stack[2].upper_protocols.append(km2)
+            self.keymanagers[(node2.name, node1.name)] = km2
 
-            self.keymanagers[(node1.name,node2.name)] = keymanager
+            
 
-            self.keymanagers[(node2.name,node1.name)] = km2
-
-            keymanager.send_request() # interface to get keys back
+            self.keymanagers[(node1.name, node2.name)].send_request() # interface to get keys back
 
 
         def run(self):
@@ -219,13 +245,13 @@ def test(sim_time, keysize):
                 delay = node1.qchannels[node2.name].distance / SPEED_OF_LIGHT
                 if i == 0:
                     start_time = self.timeline.now()
-                    end_time = start_time + (int((self.key_size +100000 / node1.source.frequency) * 1e12)) + delay  
+                    end_time = start_time + (int((self.key_size +10000 / node1.source.frequency) * 1e12)) + delay  
                     process = Process(self,"GetKey",[node1,node2])
                     event = Event(start_time, process)
                     self.timeline.schedule(event)
                 else:
                     start_time = end_time   # Schedule next round after the previous one finishes
-                    end_time = start_time + (int((self.key_size +100000 / node1.source.frequency) * 1e12)) + delay
+                    end_time = start_time + (int((self.key_size +10000 / node1.source.frequency) * 1e12)) + delay
                     process = Process(self,"GetKey",[node1,node2])
                     event = Event(start_time, process)
                     self.timeline.schedule(event)

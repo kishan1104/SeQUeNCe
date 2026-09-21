@@ -190,22 +190,22 @@ class DPSNode(QKDNode):
         self.detectors[1].add_receiver(self)
         self.counter = 0
         ls_name = name + ".light_source"
-        if stack_size > 0:
-            # print('this is run')
-            self.protocols = []
-            self.protocol_stack[0] = DPS(self, name + ".DPS", ls_name, name+'.interferometer')
-            self.protocols.append(self.protocol_stack[0])
-        if stack_size > 1:
-            # Create cascade protocol
-            self.protocol_stack[1] = Cascade(self, name + ".cascade")
-            self.protocols.append(self.protocol_stack[1])
-            self.protocol_stack[0].upper_protocols.append(self.protocol_stack[1])
-            self.protocol_stack[1].lower_protocols.append(self.protocol_stack[0])
-        if stack_size > 2:
-            self.protocol_stack[2] = PrivacyAmplification(self,name+".privacy_amplification")
-            self.protocols.append(self.protocol_stack[2])
-            self.protocol_stack[1].upper_protocols.append(self.protocol_stack[2])
-            self.protocol_stack[2].lower_protocols.append(self.protocol_stack[1]) 
+        # if stack_size > 0:
+        #     # print('this is run')
+        #     self.protocols = []
+        #     self.protocol_stack[0] = DPS(self, name + ".DPS", ls_name, name+'.interferometer')
+        #     self.protocols.append(self.protocol_stack[0])
+        # if stack_size > 1:
+        #     # Create cascade protocol
+        #     self.protocol_stack[1] = Cascade(self, name + ".cascade")
+        #     self.protocols.append(self.protocol_stack[1])
+        #     self.protocol_stack[0].upper_protocols.append(self.protocol_stack[1])
+        #     self.protocol_stack[1].lower_protocols.append(self.protocol_stack[0])
+        # if stack_size > 2:
+        #     self.protocol_stack[2] = PrivacyAmplification(self,name+".privacy_amplification")
+        #     self.protocols.append(self.protocol_stack[2])
+        #     self.protocol_stack[1].upper_protocols.append(self.protocol_stack[2])
+        #     self.protocol_stack[2].lower_protocols.append(self.protocol_stack[1]) 
     def init(self):
         pass
         
@@ -263,7 +263,7 @@ class DPSNode(QKDNode):
 class EveDPSNode(QKDNode):
     def __init__(self, name, timeline, attack='', seed=None, ):
         super().__init__(name, timeline, seed=seed,)
-        source = CLightSource(name = name+'light_source',
+        self.source = CLightSource(name = name+'light_source',
                                 timeline=timeline,
                                 frequency=1e6,
                                 mean_photon_num=0.2,
@@ -272,8 +272,8 @@ class EveDPSNode(QKDNode):
         self.bobKey = ''
         self.eveKey = []
         self.dpskeys = {}
-        self.add_component(source)
-        source.add_receiver(self)
+        self.add_component(self.source)
+        self.source.add_receiver(self)
         self.detectors = [CDetector(name + ".detector" + str(i), timeline) for i in range(2)]
         self.interferometer = CInterferometer(name + ".interferometer", timeline, time_bin["bin_separation"])
         self.interferometer.add_receiver(self.detectors[0])

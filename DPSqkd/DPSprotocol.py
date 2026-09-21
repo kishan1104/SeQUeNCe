@@ -493,6 +493,6 @@ class DPS(StackProtocol):
     def set_key(self):
         # print(f'{self} called the set_key')
         bits = self.key_bits[0:self.key_lengths[0]]
-        del self.key_bits[0:self.key_lengths[0]]
+        self.key_bits = []
         self.key = int("".join(str(b) for b in bits), 2)
         # print(f'after set key is done key_bits length = {len(self.key_bits)}')

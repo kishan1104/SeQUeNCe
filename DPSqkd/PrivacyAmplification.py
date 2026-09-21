@@ -134,7 +134,7 @@ class PrivacyAmplification(StackProtocol):
                 seed=self.another.toeplitsz_seed
             )
             self.final_key = final_key
-        # print(self.name + f' got valid key')
+        print(self.name + f' got valid key')
         for p in self.upper_protocols:
             # print(f'Popping key to {p}')
             p.pop(self.final_key)  # interface for DPS to return generated keys
