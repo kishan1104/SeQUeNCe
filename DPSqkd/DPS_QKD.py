@@ -12,10 +12,13 @@ from DPSqkd.Utility import calculate_qber, estimate_qber, CreateNetwork
 from DPSqkd.CustomComponents import DPSNode, ExtRouterNetTopo, EveDPSNode
 from sequence.components.optical_channel import QuantumChannel, ClassicalChannel
 
+import networkx as nx
+
 # tl = Timeline()
 # tl2 = Timeline()
 pi  = np.pi
 
+G = nx.Graph()
 
 
     
@@ -145,10 +148,10 @@ class Node3Net:
 
 
 
-# network_config_file = 'clustered_network.json'
-# network_topo = ExtRouterNetTopo(network_config_file)
-# timeline = network_topo.get_timeline()
-# routers = network_topo.get_nodes_by_type(ExtRouterNetTopo.DPS_NODE)
+network_config_file = 'clustered_network.json'
+network_topo = ExtRouterNetTopo(network_config_file)
+timeline = network_topo.get_timeline()
+routers = network_topo.get_nodes_by_type(ExtRouterNetTopo.DPS_NODE)
 
 
 # router_names = [node.name for node in routers]
