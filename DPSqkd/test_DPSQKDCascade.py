@@ -49,7 +49,7 @@ class KeyManager():
         
     def send_request(self):
         for p in self.lower_protocols:
-            print(p)
+            # print(p)
             p.push(self.keysize, self.num_keys) # interface for cascade to generate keys
             
     def pop(self, key): # interface for cascade to return generated keys
@@ -246,13 +246,13 @@ def test(sim_time, keysize, net_file, source, destination, stack_size=3, frequen
 
     # start simulation and record timing
     timeline.init()
-    # net.run()
+    net.run()
     tick = time.time()
     timeline.run()
 
 
     tl.init()
-    km1.send_request()
+    # km1.send_request()
     tl.run()
 
     print(km1.keys,km2.keys)
@@ -266,4 +266,4 @@ def test(sim_time, keysize, net_file, source, destination, stack_size=3, frequen
 
     print("execution time %.2f sec" % (time.time() - tick))
 
-test(1e12 , 128, "./clustered_network.json", "N0", "N00")
+test(1e12 , 128, "./clustered_network.json", "N0", "N1")
