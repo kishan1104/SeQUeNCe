@@ -121,7 +121,7 @@ class PrivacyAmplification(StackProtocol):
             final_key, seed = toeplitz_hash(
                 key,
                 keylen=self.keysize,
-                output_length=self.keysize//2
+                output_length=self.keysize
             )   
             self.another.toeplitsz_seed = seed
             self.toeplitsz_seed = seed
@@ -130,7 +130,7 @@ class PrivacyAmplification(StackProtocol):
             final_key = toeplitz_hash_with_seed(
                 key,
                 keylen=self.keysize,
-                output_length=self.keysize//2,
+                output_length=self.keysize,
                 seed=self.another.toeplitsz_seed
             )
             self.final_key = final_key

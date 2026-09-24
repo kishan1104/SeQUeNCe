@@ -166,13 +166,15 @@ class CInterferometer(Interferometer):
         self.timeline.schedule(event)
 
 class DPSNode(QKDNode):
-    def __init__(self, name, timeline, seed=None, stack_size = 5):
+    def __init__(self, name, timeline, seed=None, stack_size = 5, frequency = 1e6, mean_photon_num = 0.2, phase_error = 0.01):
         super().__init__(name, timeline, seed=seed,stack_size=stack_size)
         self.source = CLightSource(name = name+'.light_source',
                                 timeline=timeline,
-                                frequency=1e6,
-                                mean_photon_num=0.2,
-                                encoding_type=time_bin)
+                                frequency=frequency,
+                                mean_photon_num=mean_photon_num,
+                                phase_error=phase_error,
+                                encoding_type=time_bin
+                                )
         self.aliceKey = ''
         self.bobKey = ''
         self.eveKey = ''
