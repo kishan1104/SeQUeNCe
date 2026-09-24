@@ -629,4 +629,4 @@ class Cascade(StackProtocol):
             self.error_bit_rate = 0
         self.time_cost = self.end_time - self.start_time
 
-        print(self.name + f' state={self.state} performance_measure, metrics \n throughput = {self.throughput}  \n secure_throughput = {self.privacy_throughput}, error_bit_rate = {self.error_bit_rate}, time_cost = {self.time_cost}')
+        print(self.name + f' state={self.state} performance_measure, metrics \nthroughput = {self.throughput}  \nerror_bit_rate = {self.error_bit_rate}')
